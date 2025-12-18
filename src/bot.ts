@@ -52,26 +52,18 @@ const stepsOrder: CalculationStep[] = [
 // URL Mini App (замени на свой после деплоя)
 const MINI_APP_URL = process.env.MINI_APP_URL || "https://your-app.vercel.app";
 
-// Команда /start
+// Команда /start - сразу открываем Mini App
 bot.command("start", async (ctx) => {
   const user = ctx.from!;
   getOrCreateUser(user.id, user.first_name, user.username);
 
-  // Клавиатура с кнопкой Mini App
+  // Сразу открываем Mini App через кнопку
   const keyboard = new InlineKeyboard()
-    .webApp("📱 Открыть калькулятор", MINI_APP_URL)
-    .row()
-    .text("📊 Расчет в чате", "start_chat_calculation");
+    .webApp("📱 Открыть калькулятор", MINI_APP_URL);
 
   await ctx.reply(
     `👋 Привет, <b>${user.first_name}</b>!\n\n` +
-      `Я помогу рассчитать <b>маржу товара</b> для Wildberries.\n\n` +
-      `📊 Что я умею:\n` +
-      `• Рассчитывать чистую прибыль\n` +
-      `• Показывать маржу и наценку\n` +
-      `• Давать рекомендации по рентабельности\n\n` +
-      `🎁 У тебя есть <b>${config.freeCalculationsLimit} бесплатных расчетов</b>!\n\n` +
-      `Выбери удобный способ:`,
+      `Нажми кнопку ниже, чтобы открыть калькулятор маржи!`,
     { parse_mode: "HTML", reply_markup: keyboard }
   );
 });
@@ -365,10 +357,41 @@ bot.catch((err) => {
   console.error("Ошибка бота:", err);
 });
 
+// Команда для установки Menu Button (на случай если автоматическая установка не сработала)
+bot.command("setmenubutton", async (ctx) => {
+  try {
+    await bot.api.setChatMenuButton({
+      menu_button: {
+        type: "web_app",
+        text: "📱 Калькулятор",
+        web_app: { url: MINI_APP_URL },
+      },
+    });
+    await ctx.reply("✅ Menu Button установлен! Теперь Mini App будет открываться при нажатии на бота.");
+  } catch (err: any) {
+    await ctx.reply(`❌ Ошибка: ${err.message}\n\nПопробуй установить вручную через @BotFather:\n/setmenubutton`);
+  }
+});
+
 // Запуск
 console.log("🤖 Бот запускается...");
 bot.start({
-  onStart: (botInfo) => {
+  onStart: async (botInfo) => {
     console.log(`✅ Бот @${botInfo.username} успешно запущен!`);
+    
+    // Устанавливаем Menu Button при запуске
+    try {
+      await bot.api.setChatMenuButton({
+        menu_button: {
+          type: "web_app",
+          text: "📱 Калькулятор",
+          web_app: { url: MINI_APP_URL },
+        },
+      });
+      console.log("✅ Menu Button установлен автоматически");
+    } catch (err: any) {
+      console.warn("⚠️ Не удалось установить Menu Button автоматически:", err.message);
+      console.log("💡 Используй команду /setmenubutton или установи через @BotFather");
+    }
   },
 });
