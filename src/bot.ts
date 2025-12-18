@@ -9,6 +9,7 @@ import {
   getRemainingCalculations,
   saveCalculation,
 } from "./database/db.js";
+import { getMainKeyboard, getRestartKeyboard } from "./keyboards/main-keyboard.js";
 
 // Тип контекста с сессией
 type MyContext = Context & SessionFlavor<CalculationSession | undefined>;
@@ -22,6 +23,36 @@ bot.use(
     initial: (): CalculationSession | undefined => undefined,
   })
 );
+
+// Middleware для обработки ошибок
+bot.use(async (ctx, next) => {
+  try {
+    await next();
+  } catch (err: any) {
+    console.error("Ошибка в обработчике:", err);
+    
+    const errorMessage = `
+⚠️ <b>Произошла ошибка</b>
+
+${err.message || "Неизвестная ошибка"}
+
+Попробуйте:
+• Нажать /restart для перезапуска бота
+• Или /help для справки
+
+Если проблема повторяется, обратитесь в поддержку.
+    `.trim();
+
+    try {
+      await ctx.reply(errorMessage, {
+        parse_mode: "HTML",
+        reply_markup: getRestartKeyboard(),
+      });
+    } catch (replyErr) {
+      console.error("Не удалось отправить сообщение об ошибке:", replyErr);
+    }
+  }
+});
 
 // Тексты для каждого шага
 const stepTexts: Record<CalculationStep, string> = {
@@ -57,14 +88,66 @@ bot.command("start", async (ctx) => {
   const user = ctx.from!;
   getOrCreateUser(user.id, user.first_name, user.username);
 
+  // Очищаем сессию при старте
+  ctx.session = undefined;
+
   // Сразу открываем Mini App через кнопку
-  const keyboard = new InlineKeyboard()
-    .webApp("📱 Открыть калькулятор", MINI_APP_URL);
+  const inlineKeyboard = new InlineKeyboard().webApp("📱 Открыть калькулятор", MINI_APP_URL);
+
+  // Добавляем постоянную клавиатуру с Mini App кнопкой
+  const mainKeyboard = getMainKeyboard(MINI_APP_URL);
 
   await ctx.reply(
     `👋 Привет, <b>${user.first_name}</b>!\n\n` +
-      `Нажми кнопку ниже, чтобы открыть калькулятор маржи!`,
-    { parse_mode: "HTML", reply_markup: keyboard }
+      `Я помогу рассчитать <b>маржу товара</b> для Wildberries.\n\n` +
+      `📊 Что я умею:\n` +
+      `• Рассчитывать чистую прибыль\n` +
+      `• Показывать маржу и наценку\n` +
+      `• Давать рекомендации по рентабельности\n\n` +
+      `🎁 У тебя есть <b>${config.freeCalculationsLimit} бесплатных расчетов</b>!\n\n` +
+      `Нажми кнопку ниже или используй меню для быстрого доступа.`,
+    { 
+      parse_mode: "HTML", 
+      reply_markup: { inline_keyboard: inlineKeyboard.inline_keyboard },
+    }
+  );
+
+  // Отправляем отдельное сообщение с постоянной клавиатурой
+  await ctx.reply(
+    "💡 <b>Быстрый доступ:</b>\nИспользуй кнопки ниже для основных действий.",
+    {
+      parse_mode: "HTML",
+      reply_markup: mainKeyboard,
+    }
+  );
+});
+
+// Команда /restart - перезапуск бота (сброс состояния)
+bot.command("restart", async (ctx) => {
+  const user = ctx.from!;
+  
+  // Очищаем сессию
+  ctx.session = undefined;
+  
+  // Обновляем пользователя
+  getOrCreateUser(user.id, user.first_name, user.username);
+
+  const keyboard = getMainKeyboard(MINI_APP_URL);
+  const inlineKeyboard = new InlineKeyboard().webApp("📱 Открыть калькулятор", MINI_APP_URL);
+
+  await ctx.reply(
+    `🔄 <b>Бот перезапущен!</b>\n\n` +
+      `Все данные сброшены. Готов к работе!\n\n` +
+      `Нажми кнопку ниже, чтобы открыть калькулятор.`,
+    {
+      parse_mode: "HTML",
+      reply_markup: { inline_keyboard: inlineKeyboard.inline_keyboard },
+    }
+  );
+
+  await ctx.reply(
+    "Используй кнопки меню для быстрого доступа:",
+    { reply_markup: keyboard }
   );
 });
 
@@ -102,19 +185,27 @@ bot.callbackQuery("start_chat_calculation", async (ctx) => {
 
 // Команда /help
 bot.command("help", async (ctx) => {
+  const keyboard = getMainKeyboard(MINI_APP_URL);
+  
   await ctx.reply(
     `📚 <b>Справка по боту</b>\n\n` +
       `<b>Доступные команды:</b>\n` +
+      `/start - Перезапустить бота\n` +
       `/calculate - Начать расчет маржи\n` +
       `/status - Проверить статус подписки\n` +
       `/subscribe - Оформить подписку\n` +
       `/cancel - Отменить текущий расчет\n` +
+      `/restart - Сбросить состояние бота\n` +
       `/help - Показать эту справку\n\n` +
       `<b>Как рассчитывается маржа:</b>\n` +
       `Маржа = (Прибыль / Выручка) × 100%\n\n` +
       `<b>Прибыль</b> = Цена продажи - Себестоимость - Комиссия WB - Логистика - Хранение\n\n` +
-      `💡 Рекомендуемая маржа для WB: от 20%`,
-    { parse_mode: "HTML" }
+      `💡 Рекомендуемая маржа для WB: от 20%\n\n` +
+      `💬 <b>Совет:</b> Используй кнопки меню для быстрого доступа!`,
+    { 
+      parse_mode: "HTML",
+      reply_markup: keyboard,
+    }
   );
 });
 
@@ -145,7 +236,10 @@ bot.command("status", async (ctx) => {
     }
   }
 
-  await ctx.reply(statusText, { parse_mode: "HTML" });
+  await ctx.reply(statusText, { 
+    parse_mode: "HTML",
+    reply_markup: getMainKeyboard(),
+  });
 });
 
 // Команда /subscribe - оформление подписки
@@ -170,9 +264,24 @@ bot.command("subscribe", async (ctx) => {
 bot.command("cancel", async (ctx) => {
   if (ctx.session) {
     ctx.session = undefined;
-    await ctx.reply("❌ Расчет отменен. Нажмите /calculate чтобы начать заново.");
+    const keyboard = getMainKeyboard(MINI_APP_URL);
+    await ctx.reply(
+      "❌ <b>Расчет отменен</b>\n\n" +
+        "Все введенные данные удалены.\n\n" +
+        "Используй кнопки меню или /calculate чтобы начать новый расчет.",
+      {
+        parse_mode: "HTML",
+        reply_markup: keyboard,
+      }
+    );
   } else {
-    await ctx.reply("Нечего отменять. Нажмите /calculate чтобы начать расчет.");
+    const keyboard = getMainKeyboard(MINI_APP_URL);
+    await ctx.reply(
+      "ℹ️ Нечего отменять.\n\n" +
+        "Вы не находитесь в процессе расчета.\n\n" +
+        "Используй кнопки меню или /calculate чтобы начать расчет.",
+      { reply_markup: keyboard }
+    );
   }
 });
 
@@ -228,21 +337,167 @@ bot.callbackQuery("subscribe_monthly", async (ctx) => {
   );
 });
 
+// ============ ОБРАБОТКА ТЕКСТОВЫХ КНОПОК ============
+
+
+bot.hears("📈 Мой статус", async (ctx) => {
+  // Симулируем команду /status
+  const user = ctx.from!;
+  const dbUser = getOrCreateUser(user.id, user.first_name, user.username);
+  const remaining = getRemainingCalculations(dbUser, config.freeCalculationsLimit);
+
+  let statusText = `📊 <b>Ваш статус</b>\n\n`;
+  statusText += `👤 ${user.first_name}\n`;
+  statusText += `📈 Выполнено расчетов: ${dbUser.calculations_count}\n\n`;
+
+  if (dbUser.subscription_until) {
+    const subDate = new Date(dbUser.subscription_until);
+    if (subDate > new Date()) {
+      statusText += `✅ <b>Подписка активна</b>\n`;
+      statusText += `📅 До: ${subDate.toLocaleDateString("ru-RU")}\n`;
+      statusText += `♾️ Безлимитные расчеты`;
+    } else {
+      statusText += `❌ Подписка истекла\n`;
+      statusText += `🎁 Осталось бесплатных: ${remaining}`;
+    }
+  } else {
+    statusText += `🎁 Осталось бесплатных расчетов: <b>${remaining}</b>`;
+    if (remaining === 0) {
+      statusText += `\n\n💳 Оформите подписку: /subscribe`;
+    }
+  }
+
+  await ctx.reply(statusText, { 
+    parse_mode: "HTML",
+    reply_markup: getMainKeyboard(),
+  });
+});
+
+bot.hears("💎 Подписка", async (ctx) => {
+  // Симулируем команду /subscribe
+  const keyboard = new InlineKeyboard().text(
+    "💳 Оформить подписку - 149₽/мес",
+    "subscribe_monthly"
+  );
+
+  await ctx.reply(
+    `💎 <b>Премиум подписка</b>\n\n` +
+      `Получите безлимитный доступ к расчетам маржи!\n\n` +
+      `✅ Безлимитные расчеты\n` +
+      `✅ Приоритетная поддержка\n` +
+      `✅ История всех расчетов\n\n` +
+      `💰 Стоимость: <b>149 ₽/месяц</b>`,
+    { parse_mode: "HTML", reply_markup: keyboard }
+  );
+});
+
+bot.hears("❓ Помощь", async (ctx) => {
+  // Симулируем команду /help
+  const keyboard = getMainKeyboard(MINI_APP_URL);
+  
+  await ctx.reply(
+    `📚 <b>Справка по боту</b>\n\n` +
+      `<b>Доступные команды:</b>\n` +
+      `/start - Перезапустить бота\n` +
+      `/calculate - Начать расчет маржи\n` +
+      `/status - Проверить статус подписки\n` +
+      `/subscribe - Оформить подписку\n` +
+      `/cancel - Отменить текущий расчет\n` +
+      `/restart - Сбросить состояние бота\n` +
+      `/help - Показать эту справку\n\n` +
+      `<b>Как рассчитывается маржа:</b>\n` +
+      `Маржа = (Прибыль / Выручка) × 100%\n\n` +
+      `<b>Прибыль</b> = Цена продажи - Себестоимость - Комиссия WB - Логистика - Хранение\n\n` +
+      `💡 Рекомендуемая маржа для WB: от 20%`,
+    {
+      parse_mode: "HTML",
+      reply_markup: keyboard,
+    }
+  );
+});
+
+bot.hears(["🔄 Перезапустить", "🔄 Перезапустить бота"], async (ctx) => {
+  // Симулируем команду /restart
+  const user = ctx.from!;
+  ctx.session = undefined;
+  getOrCreateUser(user.id, user.first_name, user.username);
+
+  const keyboard = getMainKeyboard(MINI_APP_URL);
+  const inlineKeyboard = new InlineKeyboard().webApp("📱 Открыть калькулятор", MINI_APP_URL);
+
+  await ctx.reply(
+    `🔄 <b>Бот перезапущен!</b>\n\n` +
+      `Все данные сброшены. Готов к работе!\n\n` +
+      `Нажми кнопку ниже, чтобы открыть калькулятор.`,
+    {
+      parse_mode: "HTML",
+      reply_markup: { inline_keyboard: inlineKeyboard.inline_keyboard },
+    }
+  );
+
+  await ctx.reply(
+    "Используй кнопки меню для быстрого доступа:",
+    { reply_markup: keyboard }
+  );
+});
+
 // ============ ОБРАБОТКА ТЕКСТОВЫХ СООБЩЕНИЙ ============
 
 bot.on("message:text", async (ctx) => {
-  // Если нет активной сессии расчета - игнорируем
+  // Если нет активной сессии расчета - показываем подсказку
   if (!ctx.session) {
-    await ctx.reply("Нажмите /calculate чтобы начать расчет маржи.\n" + "Или /help для справки.");
+    const keyboard = getMainKeyboard(MINI_APP_URL);
+    await ctx.reply(
+      "💡 <b>Подсказка</b>\n\n" +
+        "Используй кнопки меню ниже или команды:\n" +
+        "• /calculate - начать расчет\n" +
+        "• /help - справка\n" +
+        "• /restart - перезапустить бота",
+      {
+        parse_mode: "HTML",
+        reply_markup: keyboard,
+      }
+    );
     return;
   }
 
   const text = ctx.message.text.trim();
+  
+  // Проверка на команды во время расчета
+  if (text.startsWith("/")) {
+    await ctx.reply(
+      "⚠️ Вы находитесь в процессе расчета.\n\n" +
+        "Используйте /cancel чтобы отменить текущий расчет.",
+      { reply_markup: getMainKeyboard() }
+    );
+    return;
+  }
+
   const number = parseFloat(text.replace(",", "."));
 
-  // Проверяем что введено число
-  if (isNaN(number) || number < 0) {
-    await ctx.reply("❌ Пожалуйста, введите корректное положительное число.");
+  // Улучшенная валидация
+  if (isNaN(number)) {
+    await ctx.reply(
+      "❌ <b>Ошибка ввода</b>\n\n" +
+        "Пожалуйста, введите <b>число</b>.\n\n" +
+        "Примеры:\n" +
+        "• 500\n" +
+        "• 1500.50\n" +
+        "• 25.5\n\n" +
+        "Или используйте /cancel чтобы отменить расчет.",
+      { parse_mode: "HTML" }
+    );
+    return;
+  }
+
+  if (number < 0) {
+    await ctx.reply(
+      "❌ <b>Ошибка ввода</b>\n\n" +
+        "Значение не может быть отрицательным.\n\n" +
+        "Пожалуйста, введите положительное число.\n\n" +
+        "Или используйте /cancel чтобы отменить расчет.",
+      { parse_mode: "HTML" }
+    );
     return;
   }
 
@@ -258,7 +513,22 @@ bot.on("message:text", async (ctx) => {
       break;
     case "wb_commission":
       if (number > 100) {
-        await ctx.reply("❌ Комиссия не может быть больше 100%");
+        await ctx.reply(
+          "❌ <b>Ошибка ввода</b>\n\n" +
+            "Комиссия не может быть больше 100%.\n\n" +
+            "Обычно комиссия WB составляет 15-25%.\n\n" +
+            "Попробуйте еще раз или используйте /cancel.",
+          { parse_mode: "HTML" }
+        );
+        return;
+      }
+      if (number < 0) {
+        await ctx.reply(
+          "❌ <b>Ошибка ввода</b>\n\n" +
+            "Комиссия не может быть отрицательной.\n\n" +
+            "Попробуйте еще раз или используйте /cancel.",
+          { parse_mode: "HTML" }
+        );
         return;
       }
       data.wbCommission = number;
@@ -367,9 +637,13 @@ bot.command("setmenubutton", async (ctx) => {
         web_app: { url: MINI_APP_URL },
       },
     });
-    await ctx.reply("✅ Menu Button установлен! Теперь Mini App будет открываться при нажатии на бота.");
+    await ctx.reply(
+      "✅ Menu Button установлен! Теперь Mini App будет открываться при нажатии на бота."
+    );
   } catch (err: any) {
-    await ctx.reply(`❌ Ошибка: ${err.message}\n\nПопробуй установить вручную через @BotFather:\n/setmenubutton`);
+    await ctx.reply(
+      `❌ Ошибка: ${err.message}\n\nПопробуй установить вручную через @BotFather:\n/setmenubutton`
+    );
   }
 });
 
@@ -377,8 +651,8 @@ bot.command("setmenubutton", async (ctx) => {
 console.log("🤖 Бот запускается...");
 bot.start({
   onStart: async (botInfo) => {
-    console.log(`✅ Бот @${botInfo.username} успешно запущен!`);
-    
+      console.log(`✅ Бот @${botInfo.username} успешно запущен!`);
+
     // Устанавливаем Menu Button при запуске
     try {
       await bot.api.setChatMenuButton({
@@ -386,12 +660,12 @@ bot.start({
           type: "web_app",
           text: "📱 Калькулятор",
           web_app: { url: MINI_APP_URL },
-        },
-      });
+    },
+  });
       console.log("✅ Menu Button установлен автоматически");
     } catch (err: any) {
       console.warn("⚠️ Не удалось установить Menu Button автоматически:", err.message);
       console.log("💡 Используй команду /setmenubutton или установи через @BotFather");
-    }
+}
   },
 });
