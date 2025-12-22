@@ -3,20 +3,30 @@ import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 
 // Синхронно загружаем dotenv через require (до ESM импортов)
-// В продакшене (Railway) переменные окружения уже доступны через process.env
-// .env файл нужен только для локальной разработки
+// Приоритет загрузки:
+// 1. .env.local (локальная разработка, не коммитится)
+// 2. .env (общие настройки)
+// 3. process.env (переменные окружения из системы/Railway)
 const dotenv = require("dotenv");
-const result = dotenv.config();
+const isProduction = process.env.NODE_ENV === "production";
+
+// В продакшене переменные окружения уже доступны через process.env
+// В разработке загружаем из файлов
+if (!isProduction) {
+  // Сначала загружаем .env.local (если есть)
+  dotenv.config({ path: ".env.local" });
+  // Затем .env (перезапишет значения из .env.local если нужно)
+  dotenv.config();
+}
 
 // Импортируем logger до использования
 import { logger } from "./utils/logger.js";
 
-// Если .env файл не найден - это нормально для продакшена
-// Проверяем только наличие обязательных переменных
-if (result.error && result.error.code !== "ENOENT") {
-  logger.error("Ошибка загрузки .env", { error: result.error.message });
-  // Не выходим, возможно переменные заданы через окружение
-}
+// Логируем окружение
+logger.info("Окружение", { 
+  env: process.env.NODE_ENV || "development",
+  isProduction 
+});
 
 if (!process.env.BOT_TOKEN) {
   logger.error("BOT_TOKEN не найден! Проверь переменные окружения.");
