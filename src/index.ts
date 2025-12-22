@@ -3,16 +3,20 @@ import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 
 // Синхронно загружаем dotenv через require (до ESM импортов)
+// В продакшене (Railway) переменные окружения уже доступны через process.env
+// .env файл нужен только для локальной разработки
 const dotenv = require("dotenv");
 const result = dotenv.config();
 
-if (result.error) {
+// Если .env файл не найден - это нормально для продакшена
+// Проверяем только наличие обязательных переменных
+if (result.error && result.error.code !== "ENOENT") {
   console.error("❌ Ошибка загрузки .env:", result.error.message);
-  process.exit(1);
+  // Не выходим, возможно переменные заданы через окружение
 }
 
 if (!process.env.BOT_TOKEN) {
-  console.error("❌ BOT_TOKEN не найден в .env файле!");
+  console.error("❌ BOT_TOKEN не найден! Проверь переменные окружения.");
   process.exit(1);
 }
 
