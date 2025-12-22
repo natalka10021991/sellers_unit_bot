@@ -30,7 +30,7 @@ bot.use(async (ctx, next) => {
     await next();
   } catch (err: any) {
     console.error("Ошибка в обработчике:", err);
-    
+
     const errorMessage = `
 ⚠️ <b>Произошла ошибка</b>
 
@@ -106,29 +106,26 @@ bot.command("start", async (ctx) => {
       `• Давать рекомендации по рентабельности\n\n` +
       `🎁 У тебя есть <b>${config.freeCalculationsLimit} бесплатных расчетов</b>!\n\n` +
       `Нажми кнопку ниже или используй меню для быстрого доступа.`,
-    { 
-      parse_mode: "HTML", 
+    {
+      parse_mode: "HTML",
       reply_markup: { inline_keyboard: inlineKeyboard.inline_keyboard },
     }
   );
 
   // Отправляем отдельное сообщение с постоянной клавиатурой
-  await ctx.reply(
-    "💡 <b>Быстрый доступ:</b>\nИспользуй кнопки ниже для основных действий.",
-    {
-      parse_mode: "HTML",
-      reply_markup: mainKeyboard,
-    }
-  );
+  await ctx.reply("💡 <b>Быстрый доступ:</b>\nИспользуй кнопки ниже для основных действий.", {
+    parse_mode: "HTML",
+    reply_markup: mainKeyboard,
+  });
 });
 
 // Команда /restart - перезапуск бота (сброс состояния)
 bot.command("restart", async (ctx) => {
   const user = ctx.from!;
-  
+
   // Очищаем сессию
   ctx.session = undefined;
-  
+
   // Обновляем пользователя
   getOrCreateUser(user.id, user.first_name, user.username);
 
@@ -145,10 +142,7 @@ bot.command("restart", async (ctx) => {
     }
   );
 
-  await ctx.reply(
-    "Используй кнопки меню для быстрого доступа:",
-    { reply_markup: keyboard }
-  );
+  await ctx.reply("Используй кнопки меню для быстрого доступа:", { reply_markup: keyboard });
 });
 
 // Callback для расчета в чате
@@ -186,7 +180,7 @@ bot.callbackQuery("start_chat_calculation", async (ctx) => {
 // Команда /help
 bot.command("help", async (ctx) => {
   const keyboard = getMainKeyboard(MINI_APP_URL);
-  
+
   await ctx.reply(
     `📚 <b>Справка по боту</b>\n\n` +
       `<b>Доступные команды:</b>\n` +
@@ -202,7 +196,7 @@ bot.command("help", async (ctx) => {
       `<b>Прибыль</b> = Цена продажи - Себестоимость - Комиссия WB - Логистика - Хранение\n\n` +
       `💡 Рекомендуемая маржа для WB: от 20%\n\n` +
       `💬 <b>Совет:</b> Используй кнопки меню для быстрого доступа!`,
-    { 
+    {
       parse_mode: "HTML",
       reply_markup: keyboard,
     }
@@ -236,7 +230,7 @@ bot.command("status", async (ctx) => {
     }
   }
 
-  await ctx.reply(statusText, { 
+  await ctx.reply(statusText, {
     parse_mode: "HTML",
     reply_markup: getMainKeyboard(),
   });
@@ -339,7 +333,6 @@ bot.callbackQuery("subscribe_monthly", async (ctx) => {
 
 // ============ ОБРАБОТКА ТЕКСТОВЫХ КНОПОК ============
 
-
 bot.hears("📈 Мой статус", async (ctx) => {
   // Симулируем команду /status
   const user = ctx.from!;
@@ -367,7 +360,7 @@ bot.hears("📈 Мой статус", async (ctx) => {
     }
   }
 
-  await ctx.reply(statusText, { 
+  await ctx.reply(statusText, {
     parse_mode: "HTML",
     reply_markup: getMainKeyboard(),
   });
@@ -394,7 +387,7 @@ bot.hears("💎 Подписка", async (ctx) => {
 bot.hears("❓ Помощь", async (ctx) => {
   // Симулируем команду /help
   const keyboard = getMainKeyboard(MINI_APP_URL);
-  
+
   await ctx.reply(
     `📚 <b>Справка по боту</b>\n\n` +
       `<b>Доступные команды:</b>\n` +
@@ -435,10 +428,7 @@ bot.hears(["🔄 Перезапустить", "🔄 Перезапустить �
     }
   );
 
-  await ctx.reply(
-    "Используй кнопки меню для быстрого доступа:",
-    { reply_markup: keyboard }
-  );
+  await ctx.reply("Используй кнопки меню для быстрого доступа:", { reply_markup: keyboard });
 });
 
 // ============ ОБРАБОТКА ТЕКСТОВЫХ СООБЩЕНИЙ ============
@@ -462,7 +452,7 @@ bot.on("message:text", async (ctx) => {
   }
 
   const text = ctx.message.text.trim();
-  
+
   // Проверка на команды во время расчета
   if (text.startsWith("/")) {
     await ctx.reply(
@@ -651,7 +641,7 @@ bot.command("setmenubutton", async (ctx) => {
 console.log("🤖 Бот запускается...");
 bot.start({
   onStart: async (botInfo) => {
-      console.log(`✅ Бот @${botInfo.username} успешно запущен!`);
+    console.log(`✅ Бот @${botInfo.username} успешно запущен!`);
 
     // Устанавливаем Menu Button при запуске
     try {
@@ -660,12 +650,12 @@ bot.start({
           type: "web_app",
           text: "📱 Калькулятор",
           web_app: { url: MINI_APP_URL },
-    },
-  });
+        },
+      });
       console.log("✅ Menu Button установлен автоматически");
     } catch (err: any) {
       console.warn("⚠️ Не удалось установить Menu Button автоматически:", err.message);
       console.log("💡 Используй команду /setmenubutton или установи через @BotFather");
-}
+    }
   },
 });

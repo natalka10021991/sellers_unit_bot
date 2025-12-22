@@ -19,8 +19,13 @@ if (!process.env.BOT_TOKEN) {
   process.exit(1);
 }
 
-// Теперь импортируем бота
-import("./bot.js").catch((err) => {
-  console.error("❌ Ошибка запуска бота:", err);
+// Теперь импортируем бота и API сервер
+Promise.all([
+  import("./bot.js"),
+  import("./api/server.js").then((module) => {
+    module.startAPIServer();
+  }),
+]).catch((err) => {
+  console.error("❌ Ошибка запуска:", err);
   process.exit(1);
 });

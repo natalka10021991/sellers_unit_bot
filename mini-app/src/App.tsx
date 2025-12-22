@@ -4,8 +4,10 @@ import { useTelegram } from "./hooks/useTelegram";
 import { Input } from "./components/Input";
 import { Button } from "./components/Button";
 import { ResultCard } from "./components/ResultCard";
+import { CategoryAutocomplete } from "./components/CategoryAutocomplete";
 
 interface FormData {
+  category: string;
   costPrice: string;
   sellingPrice: string;
   wbCommission: string;
@@ -28,12 +30,45 @@ interface MarginResult {
 }
 
 const initialFormData: FormData = {
+  category: "",
   costPrice: "",
   sellingPrice: "",
   wbCommission: "15",
   logistics: "",
   storage: "",
 };
+
+// URL API бота
+// В Telegram Mini App нельзя использовать localhost
+const getApiUrl = () => {
+  // Если задан через переменную окружения - используем его
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  
+  // Если открыто в браузере (localhost) - используем localhost
+  if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+    return "http://localhost:3000";
+  }
+  
+  // В Telegram Mini App (продакшен) - нужно указать URL бота
+  // Пока используем тот же домен, что и Mini App (если бот задеплоен там же)
+  // Или можно получить из Telegram WebApp initData
+  const tg = window.Telegram?.WebApp;
+  if (tg?.initDataUnsafe?.start_param) {
+    // Можно передать URL бота через start_param
+    const startParam = tg.initDataUnsafe.start_param;
+    if (startParam.startsWith("http")) {
+      return startParam;
+    }
+  }
+  
+  // По умолчанию - тот же домен (для случая, когда бот и Mini App на одном домене)
+  // TODO: После деплоя бота указать его URL здесь или через переменную окружения
+  return window.location.origin.replace(/mini-app.*$/, "").replace(/\/$/, "") || "";
+};
+
+const API_URL = getApiUrl();
 
 export default function App() {
   const { user, isReady, hapticFeedback } = useTelegram();
@@ -207,6 +242,34 @@ export default function App() {
               </motion.div>
 
               {/* Form */}
+              {/* Категория товара с autocomplete */}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <CategoryAutocomplete
+                  value={formData.category}
+                  onChange={(category) => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      category: category?.name || "",
+                    }));
+                  }}
+                  onCommissionChange={(commission) => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      wbCommission: commission.toString(),
+                    }));
+                    // Убираем ошибку комиссии при автозаполнении
+                    if (errors.wbCommission) {
+                      setErrors((prev) => ({ ...prev, wbCommission: undefined }));
+                    }
+                  }}
+                  apiUrl={API_URL}
+                  error={errors.category}
+                />
+              </motion.div>
+
               <Input
                 label="Себестоимость"
                 icon="💰"
@@ -234,7 +297,7 @@ export default function App() {
               <Input
                 label="Комиссия Wildberries"
                 icon="📊"
-                placeholder="15-25%"
+                placeholder="15-25% (заполняется автоматически)"
                 suffix="%"
                 value={formData.wbCommission}
                 onChange={(e) => handleInputChange("wbCommission", e.target.value)}

@@ -9,6 +9,10 @@ export const config = {
   // Telegram
   botToken: process.env.BOT_TOKEN,
 
+  // Wildberries API
+  wbApiToken: process.env.WB_API_TOKEN,
+  wbApiBaseUrl: "https://content-api.wildberries.ru",
+
   // Лимиты
   freeCalculationsLimit: 5,
 
@@ -18,6 +22,9 @@ export const config = {
 
   // База данных
   dbPath: process.env.DB_PATH || "./data/bot.db",
+
+  // HTTP Server для API прокси
+  apiPort: Number(process.env.API_PORT) || 3000,
 
   // Окружение
   isDev: process.env.NODE_ENV === "development",
