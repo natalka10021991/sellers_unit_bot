@@ -69,10 +69,13 @@ export function CategoryAutocomplete({
   }, []);
 
   const loadCategories = async () => {
-    // Если API URL не задан или пустой - пропускаем загрузку
-    if (!apiUrl || apiUrl === "" || apiUrl.includes("localhost")) {
-      console.warn("API URL не настроен для Telegram Mini App. Категории будут недоступны.");
+    // Если API URL не задан или пустой - пропускаем загрузку, но показываем компонент
+    if (!apiUrl || apiUrl === "" || (apiUrl.includes("localhost") && window.location.hostname !== "localhost")) {
+      console.warn("API URL не настроен для Telegram Mini App. Категории будут недоступны, но можно ввести вручную.");
       setIsLoading(false);
+      // Показываем пустой список, чтобы пользователь мог ввести категорию вручную
+      setCategories([]);
+      setFilteredCategories([]);
       return;
     }
 
@@ -98,11 +101,15 @@ export function CategoryAutocomplete({
         console.error("Ошибка загрузки категорий:", data.error);
         // Если API недоступен, показываем компонент, но без категорий
         // Пользователь все равно может ввести категорию вручную
+        setCategories([]);
+        setFilteredCategories([]);
       }
     } catch (err: any) {
       console.error("Ошибка при загрузке категорий:", err);
       console.warn("Компонент будет работать в режиме ручного ввода");
       // Не скрываем компонент при ошибке - пользователь может ввести вручную
+      setCategories([]);
+      setFilteredCategories([]);
     } finally {
       setIsLoading(false);
     }

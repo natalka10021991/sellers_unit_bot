@@ -80,8 +80,8 @@ const stepsOrder: CalculationStep[] = [
 
 // ============ КОМАНДЫ ============
 
-// URL Mini App (замени на свой после деплоя)
-const MINI_APP_URL = process.env.MINI_APP_URL || "https://your-app.vercel.app";
+// URL Mini App
+const MINI_APP_URL = process.env.MINI_APP_URL || "https://mini-app-red-seven.vercel.app";
 
 // Команда /start - сразу открываем Mini App
 bot.command("start", async (ctx) => {
