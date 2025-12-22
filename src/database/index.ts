@@ -1,4 +1,4 @@
-import Database from "better-sqlite3";
+import Database, { type Database as DatabaseType } from "better-sqlite3";
 import { existsSync, mkdirSync } from "fs";
 import { dirname } from "path";
 import { config } from "../config/index.js";
@@ -11,7 +11,7 @@ if (!existsSync(dbDir)) {
 }
 
 // Инициализация базы данных
-const db = new Database(config.dbPath);
+const db: DatabaseType = new Database(config.dbPath);
 
 // Включаем WAL режим для лучшей производительности
 db.pragma("journal_mode = WAL");

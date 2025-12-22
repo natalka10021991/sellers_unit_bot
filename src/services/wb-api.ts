@@ -1,22 +1,27 @@
 import { config } from "../config/index.js";
+import { logger } from "../utils/logger.js";
 
 /**
  * Интерфейсы для WB API
  */
 export interface WBParentCategory {
+  id: number;
   name: string;
-  parent: string;
-  isVisible: boolean;
-  objectID: number;
-  objectName: string;
+  isVisible?: boolean;
+  // Старые поля для обратной совместимости
+  objectID?: number;
+  objectName?: string;
+  parent?: number | string;
 }
 
 export interface WBSubject {
+  id: number;
   name: string;
   parent: number;
-  isVisible: boolean;
-  objectID: number;
-  objectName: string;
+  isVisible?: boolean;
+  // Старые поля для обратной совместимости
+  objectID?: number;
+  objectName?: string;
 }
 
 /**
@@ -35,7 +40,7 @@ export class WBAPIService {
     this.token = config.wbApiToken;
 
     if (!this.token) {
-      console.warn("⚠️ WB_API_TOKEN не установлен. API запросы не будут работать.");
+      logger.warn("⚠️ WB_API_TOKEN не установлен. API запросы не будут работать.");
     }
   }
 
@@ -74,15 +79,29 @@ export class WBAPIService {
         );
       }
 
-      const categories: WBParentCategory[] = await response.json();
+      const responseData = (await response.json()) as {
+        data?: WBParentCategory[];
+        error?: boolean;
+        errorText?: string;
+      };
+
+      // Проверяем наличие ошибок в ответе
+      if (responseData.error || !responseData.data) {
+        throw new Error(
+          responseData.errorText || "Не удалось получить категории"
+        );
+      }
+
+      const categories = responseData.data;
 
       // Сохраняем в кэш на 1 час
       this.cache.categories = categories;
       this.cache.categoriesExpiry = Date.now() + 60 * 60 * 1000;
 
+      logger.debug("Категории WB загружены", { count: categories.length });
       return categories;
     } catch (error: any) {
-      console.error("Ошибка при получении категорий WB:", error);
+      logger.error("Ошибка при получении категорий WB", error);
       throw new Error(`Не удалось получить категории: ${error.message}`);
     }
   }
@@ -115,10 +134,24 @@ export class WBAPIService {
         );
       }
 
-      const subjects: WBSubject[] = await response.json();
+      const responseData = (await response.json()) as {
+        data?: WBSubject[];
+        error?: boolean;
+        errorText?: string;
+      };
+
+      // Проверяем наличие ошибок в ответе
+      if (responseData.error || !responseData.data) {
+        throw new Error(
+          responseData.errorText || "Не удалось получить предметы"
+        );
+      }
+
+      const subjects = responseData.data;
+      logger.debug("Предметы WB загружены", { parentId, count: subjects.length });
       return subjects;
     } catch (error: any) {
-      console.error("Ошибка при получении предметов WB:", error);
+      logger.error("Ошибка при получении предметов WB", error, { parentId });
       throw new Error(`Не удалось получить предметы: ${error.message}`);
     }
   }

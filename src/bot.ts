@@ -10,6 +10,9 @@ import {
   saveCalculation,
 } from "./database/db.js";
 import { getMainKeyboard, getRestartKeyboard } from "./keyboards/main-keyboard.js";
+import { logger } from "./utils/logger.js";
+import { rateLimit } from "./middleware/rate-limit.js";
+import { setupGracefulShutdown } from "./utils/graceful-shutdown.js";
 
 // Тип контекста с сессией
 type MyContext = Context & SessionFlavor<CalculationSession | undefined>;
@@ -24,12 +27,33 @@ bot.use(
   })
 );
 
+// Middleware для логирования запросов
+bot.use(async (ctx, next) => {
+  const userId = ctx.from?.id;
+  const username = ctx.from?.username;
+  const command = ctx.message?.text || ctx.callbackQuery?.data || "unknown";
+
+  logger.debug("Incoming request", { userId, username, command });
+
+  const startTime = Date.now();
+  await next();
+  const duration = Date.now() - startTime;
+
+  logger.debug("Request processed", { userId, command, duration: `${duration}ms` });
+});
+
+// Rate limiting middleware
+bot.use(rateLimit(config.rateLimitMaxRequests, config.rateLimitWindowMs));
+
 // Middleware для обработки ошибок
 bot.use(async (ctx, next) => {
   try {
     await next();
   } catch (err: any) {
-    console.error("Ошибка в обработчике:", err);
+    logger.error("Ошибка в обработчике", err, {
+      userId: ctx.from?.id,
+      chatId: ctx.chat?.id,
+    });
 
     const errorMessage = `
 ⚠️ <b>Произошла ошибка</b>
@@ -49,7 +73,7 @@ ${err.message || "Неизвестная ошибка"}
         reply_markup: getRestartKeyboard(),
       });
     } catch (replyErr) {
-      console.error("Не удалось отправить сообщение об ошибке:", replyErr);
+      logger.error("Не удалось отправить сообщение об ошибке", replyErr);
     }
   }
 });
@@ -80,8 +104,8 @@ const stepsOrder: CalculationStep[] = [
 
 // ============ КОМАНДЫ ============
 
-// URL Mini App
-const MINI_APP_URL = process.env.MINI_APP_URL || "https://mini-app-red-seven.vercel.app";
+// URL Mini App из конфига
+const MINI_APP_URL = config.miniAppUrl;
 
 // Команда /start - сразу открываем Mini App
 bot.command("start", async (ctx) => {
@@ -612,9 +636,9 @@ bot.callbackQuery("new_calculation", async (ctx) => {
 
 // ============ ЗАПУСК БОТА ============
 
-// Обработка ошибок
+// Обработка ошибок на уровне бота
 bot.catch((err) => {
-  console.error("Ошибка бота:", err);
+  logger.error("Критическая ошибка бота", err);
 });
 
 // Команда для установки Menu Button (на случай если автоматическая установка не сработала)
@@ -638,10 +662,17 @@ bot.command("setmenubutton", async (ctx) => {
 });
 
 // Запуск
-console.log("🤖 Бот запускается...");
+logger.info("🤖 Бот запускается...");
+
+// Настраиваем graceful shutdown
+setupGracefulShutdown(bot);
+
 bot.start({
   onStart: async (botInfo) => {
-    console.log(`✅ Бот @${botInfo.username} успешно запущен!`);
+    logger.info(`✅ Бот @${botInfo.username} успешно запущен!`, {
+      botId: botInfo.id,
+      username: botInfo.username,
+    });
 
     // Устанавливаем Menu Button при запуске
     try {
@@ -652,10 +683,10 @@ bot.start({
           web_app: { url: MINI_APP_URL },
         },
       });
-      console.log("✅ Menu Button установлен автоматически");
+      logger.info("✅ Menu Button установлен автоматически");
     } catch (err: any) {
-      console.warn("⚠️ Не удалось установить Menu Button автоматически:", err.message);
-      console.log("💡 Используй команду /setmenubutton или установи через @BotFather");
+      logger.warn("⚠️ Не удалось установить Menu Button автоматически", err as Error);
+      logger.info("💡 Используй команду /setmenubutton или установи через @BotFather");
     }
   },
 });

@@ -2,7 +2,7 @@ import type { BotContext, ConversationState } from "../types/index.js";
 import {
   calculateMargin,
   formatMarginResult,
-} from "../services/marginCalculator.js";
+} from "../services/margin-calculator.js";
 import { incrementCalculations } from "../database/index.js";
 import {
   mainMenuKeyboard,

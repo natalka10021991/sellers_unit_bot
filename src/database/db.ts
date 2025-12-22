@@ -1,15 +1,15 @@
-import Database from 'better-sqlite3';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import Database, { type Database as DatabaseType } from "better-sqlite3";
+import path from "path";
+import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DB_PATH = path.join(__dirname, '../../data.db');
+const DB_PATH = path.join(__dirname, "../../data.db");
 
 // Создаем подключение к базе данных
-const db = new Database(DB_PATH);
+const db: DatabaseType = new Database(DB_PATH);
 
 // Включаем WAL режим для лучшей производительности
-db.pragma('journal_mode = WAL');
+db.pragma("journal_mode = WAL");
 
 // Создаем таблицу пользователей
 db.exec(`
@@ -52,37 +52,39 @@ export interface DbUser {
 /**
  * Получает или создает пользователя
  */
-export function getOrCreateUser(
-  id: number, 
-  firstName: string, 
-  username?: string
-): DbUser {
-  const existing = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as DbUser | undefined;
-  
+export function getOrCreateUser(id: number, firstName: string, username?: string): DbUser {
+  const existing = db.prepare("SELECT * FROM users WHERE id = ?").get(id) as DbUser | undefined;
+
   if (existing) {
     // Обновляем данные пользователя
-    db.prepare(`
+    db.prepare(
+      `
       UPDATE users SET username = ?, first_name = ? WHERE id = ?
-    `).run(username ?? null, firstName, id);
-    
-    return db.prepare('SELECT * FROM users WHERE id = ?').get(id) as DbUser;
+    `
+    ).run(username ?? null, firstName, id);
+
+    return db.prepare("SELECT * FROM users WHERE id = ?").get(id) as DbUser;
   }
-  
+
   // Создаем нового пользователя
-  db.prepare(`
+  db.prepare(
+    `
     INSERT INTO users (id, username, first_name) VALUES (?, ?, ?)
-  `).run(id, username ?? null, firstName);
-  
-  return db.prepare('SELECT * FROM users WHERE id = ?').get(id) as DbUser;
+  `
+  ).run(id, username ?? null, firstName);
+
+  return db.prepare("SELECT * FROM users WHERE id = ?").get(id) as DbUser;
 }
 
 /**
  * Увеличивает счетчик расчетов пользователя
  */
 export function incrementCalculations(userId: number): void {
-  db.prepare(`
+  db.prepare(
+    `
     UPDATE users SET calculations_count = calculations_count + 1 WHERE id = ?
-  `).run(userId);
+  `
+  ).run(userId);
 }
 
 /**
@@ -96,7 +98,7 @@ export function hasAccessToCalculate(user: DbUser, freeLimit: number): boolean {
       return true;
     }
   }
-  
+
   // Проверяем лимит бесплатных расчетов
   return user.calculations_count < freeLimit;
 }
@@ -112,7 +114,7 @@ export function getRemainingCalculations(user: DbUser, freeLimit: number): numbe
       return Infinity;
     }
   }
-  
+
   return Math.max(0, freeLimit - user.calculations_count);
 }
 
@@ -122,10 +124,12 @@ export function getRemainingCalculations(user: DbUser, freeLimit: number): numbe
 export function activateSubscription(userId: number, days: number = 30): void {
   const until = new Date();
   until.setDate(until.getDate() + days);
-  
-  db.prepare(`
+
+  db.prepare(
+    `
     UPDATE users SET subscription_until = ? WHERE id = ?
-  `).run(until.toISOString(), userId);
+  `
+  ).run(until.toISOString(), userId);
 }
 
 /**
@@ -143,11 +147,13 @@ export function saveCalculation(
     marginPercent: number;
   }
 ): void {
-  db.prepare(`
+  db.prepare(
+    `
     INSERT INTO calculations 
     (user_id, cost_price, selling_price, wb_commission, logistics, storage, profit, margin_percent)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
+  `
+  ).run(
     userId,
     data.costPrice,
     data.sellingPrice,
@@ -160,3 +166,14 @@ export function saveCalculation(
 }
 
 export { db };
+
+/**
+ * Закрыть соединение с базой данных
+ */
+export function closeDatabase(): void {
+  try {
+    db.close();
+  } catch (error) {
+    console.error("Ошибка при закрытии БД:", error);
+  }
+}

@@ -11,13 +11,16 @@ if (result.error) {
   process.exit(1);
 }
 
-console.log("✅ .env загружен");
-console.log("   BOT_TOKEN:", process.env.BOT_TOKEN ? "✓ найден" : "✗ НЕ НАЙДЕН");
-
 if (!process.env.BOT_TOKEN) {
   console.error("❌ BOT_TOKEN не найден в .env файле!");
   process.exit(1);
 }
+
+// Импортируем logger после загрузки .env
+import { logger } from "./utils/logger.js";
+
+logger.info("✅ .env загружен");
+logger.info("   BOT_TOKEN:", { found: !!process.env.BOT_TOKEN });
 
 // Теперь импортируем бота и API сервер
 Promise.all([

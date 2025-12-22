@@ -2,6 +2,7 @@ import express, { Express, Request, Response } from "express";
 import cors from "cors";
 import { config } from "../config/index.js";
 import { wbApiService } from "../services/wb-api.js";
+import { logger } from "../utils/logger.js";
 
 /**
  * HTTP сервер для API прокси
@@ -42,10 +43,10 @@ export function createAPIServer(): Express {
       
       // Форматируем для удобства использования в Mini App
       const formatted = categories
-        .filter((cat) => cat.isVisible) // Только видимые категории
+        .filter((cat) => cat.isVisible !== false) // Только видимые категории
         .map((cat) => ({
-          id: cat.objectID,
-          name: cat.objectName || cat.name,
+          id: cat.id || cat.objectID || 0,
+          name: cat.name || cat.objectName || "",
           parent: cat.parent,
         }))
         .sort((a, b) => a.name.localeCompare(b.name)); // Сортируем по алфавиту
@@ -56,7 +57,7 @@ export function createAPIServer(): Express {
         count: formatted.length,
       });
     } catch (error: any) {
-      console.error("Ошибка в /api/categories:", error);
+      logger.error("Ошибка в /api/categories", error);
       res.status(500).json({
         success: false,
         error: error.message || "Не удалось получить категории",
@@ -82,10 +83,10 @@ export function createAPIServer(): Express {
       const subjects = await wbApiService.getSubjects(categoryId);
       
       const formatted = subjects
-        .filter((subj) => subj.isVisible)
+        .filter((subj) => subj.isVisible !== false)
         .map((subj) => ({
-          id: subj.objectID,
-          name: subj.objectName || subj.name,
+          id: subj.id || subj.objectID || 0,
+          name: subj.name || subj.objectName || "",
           parent: subj.parent,
         }))
         .sort((a, b) => a.name.localeCompare(b.name));
@@ -96,7 +97,7 @@ export function createAPIServer(): Express {
         count: formatted.length,
       });
     } catch (error: any) {
-      console.error("Ошибка в /api/categories/:id/subjects:", error);
+      logger.error("Ошибка в /api/categories/:id/subjects", error, { categoryId: req.params.id });
       res.status(500).json({
         success: false,
         error: error.message || "Не удалось получить предметы",
@@ -129,7 +130,7 @@ export function createAPIServer(): Express {
         },
       });
     } catch (error: any) {
-      console.error("Ошибка в /api/commission/:categoryId:", error);
+      logger.error("Ошибка в /api/commission/:categoryId", error, { categoryId: req.params.categoryId });
       res.status(500).json({
         success: false,
         error: error.message || "Не удалось получить комиссию",
@@ -147,7 +148,7 @@ export function createAPIServer(): Express {
 
   // Error handler
   app.use((err: any, req: Request, res: Response, next: any) => {
-    console.error("API Error:", err);
+    logger.error("API Error", err, { path: req.path, method: req.method });
     res.status(500).json({
       success: false,
       error: "Внутренняя ошибка сервера",
@@ -165,12 +166,15 @@ export function startAPIServer(): void {
   const port = config.apiPort;
 
   app.listen(port, () => {
-    console.log(`🌐 API сервер запущен на http://localhost:${port}`);
-    console.log(`   Endpoints:`);
-    console.log(`   - GET /health`);
-    console.log(`   - GET /api/categories`);
-    console.log(`   - GET /api/categories/:id/subjects`);
-    console.log(`   - GET /api/commission/:categoryId`);
+    logger.info(`🌐 API сервер запущен на http://localhost:${port}`, {
+      port,
+      endpoints: [
+        "GET /health",
+        "GET /api/categories",
+        "GET /api/categories/:id/subjects",
+        "GET /api/commission/:categoryId",
+      ],
+    });
   });
 }
 

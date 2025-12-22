@@ -11,7 +11,7 @@ import {
  * Состояние сессии пользователя для пошагового ввода
  */
 interface CalculationSession {
-visibleFields  step: "cost_price" | "selling_price" | "commission" | "logistics" | "storage" | "confirm";
+  step: "cost_price" | "selling_price" | "commission" | "logistics" | "storage" | "confirm";
   data: Partial<MarginInput>;
 }
 
