@@ -1,0 +1,15 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify deployment
+        run: |
+          echo "🚀 Деплой на production запущен из ветки main"
+          echo "Railway и Vercel автоматически задеплоят изменения"
+
