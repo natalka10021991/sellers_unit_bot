@@ -1,12 +1,13 @@
 {
   "name": "wb-margin-bot",
   "version": "1.0.0",
+  "type": "module",
   "description": "Telegram бот для расчета маржи товаров на Wildberries",
-  "main": "dist/bot.js",
+  "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "start": "node dist/bot.js",
+    "start": "node dist/index.js",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [
