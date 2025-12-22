@@ -41,9 +41,11 @@ const initialFormData: FormData = {
 // URL API бота
 // В Telegram Mini App нельзя использовать localhost
 const getApiUrl = () => {
-  // Если задан через переменную окружения - используем его
+  // Если задан через переменную окружения - используем его (приоритет)
   if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
+    const url = import.meta.env.VITE_API_URL.trim();
+    // Убираем слэш в конце, если есть
+    return url.endsWith("/") ? url.slice(0, -1) : url;
   }
   
   // Если открыто в браузере (localhost) - используем localhost
@@ -51,21 +53,21 @@ const getApiUrl = () => {
     return "http://localhost:3000";
   }
   
-  // В Telegram Mini App (продакшен) - нужно указать URL бота
-  // Пока используем тот же домен, что и Mini App (если бот задеплоен там же)
-  // Или можно получить из Telegram WebApp initData
+  // В Telegram Mini App (продакшен) - можно получить URL бота из start_param
   const tg = window.Telegram?.WebApp;
   if (tg?.initDataUnsafe?.start_param) {
-    // Можно передать URL бота через start_param
     const startParam = tg.initDataUnsafe.start_param;
     if (startParam.startsWith("http")) {
-      return startParam;
+      return startParam.endsWith("/") ? startParam.slice(0, -1) : startParam;
     }
   }
   
-  // По умолчанию - тот же домен (для случая, когда бот и Mini App на одном домене)
-  // TODO: После деплоя бота указать его URL здесь или через переменную окружения
-  return window.location.origin.replace(/mini-app.*$/, "").replace(/\/$/, "") || "";
+  // Fallback: если не задан VITE_API_URL, возвращаем пустую строку
+  // Это означает, что API будет недоступен, но приложение не сломается
+  console.warn(
+    "⚠️ VITE_API_URL не задан! Создай файл mini-app/.env с переменной VITE_API_URL=https://твой-бот-url.railway.app"
+  );
+  return "";
 };
 
 const API_URL = getApiUrl();

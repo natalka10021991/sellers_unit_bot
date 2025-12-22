@@ -48,3 +48,4 @@ export type CalculationStep =
   | 'storage'         // Ввод хранения
   | 'complete';       // Расчет завершен
 
+

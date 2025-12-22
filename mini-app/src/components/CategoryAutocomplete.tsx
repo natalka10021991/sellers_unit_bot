@@ -27,6 +27,7 @@ export function CategoryAutocomplete({
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [inputValue, setInputValue] = useState<string>(value);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -35,21 +36,28 @@ export function CategoryAutocomplete({
     loadCategories();
   }, []);
 
+  // Синхронизируем inputValue с внешним value
+  useEffect(() => {
+    if (!selectedCategory) {
+      setInputValue(value);
+    }
+  }, [value, selectedCategory]);
+
   // Фильтруем категории при изменении значения
   useEffect(() => {
-    if (value.trim() === "") {
+    if (inputValue.trim() === "") {
       setFilteredCategories(categories.slice(0, 10)); // Показываем первые 10
       return;
     }
 
     const filtered = categories
       .filter((cat) =>
-        cat.name.toLowerCase().includes(value.toLowerCase())
+        cat.name.toLowerCase().includes(inputValue.toLowerCase())
       )
       .slice(0, 10); // Ограничиваем 10 результатами
 
     setFilteredCategories(filtered);
-  }, [value, categories]);
+  }, [inputValue, categories]);
 
   // Закрываем dropdown при клике вне компонента
   useEffect(() => {
@@ -118,6 +126,7 @@ export function CategoryAutocomplete({
   const handleSelect = useCallback(
     async (category: Category) => {
       setSelectedCategory(category);
+      setInputValue(category.name);
       onChange(category);
       setIsOpen(false);
       inputRef.current?.blur();
@@ -143,10 +152,14 @@ export function CategoryAutocomplete({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
-    if (!selectedCategory || newValue !== selectedCategory.name) {
+    setInputValue(newValue);
+    
+    // Если пользователь изменил текст, сбрасываем выбранную категорию
+    if (selectedCategory && newValue !== selectedCategory.name) {
       setSelectedCategory(null);
       onChange(null);
     }
+    
     setIsOpen(true);
   };
 
@@ -165,7 +178,7 @@ export function CategoryAutocomplete({
         <input
           ref={inputRef}
           type="text"
-          value={selectedCategory?.name || value}
+          value={selectedCategory?.name || inputValue}
           onChange={handleInputChange}
           onFocus={handleInputFocus}
           placeholder="Начните вводить название категории..."
@@ -196,9 +209,9 @@ export function CategoryAutocomplete({
             type="button"
             onClick={() => {
               setSelectedCategory(null);
+              setInputValue("");
               onChange(null);
               if (inputRef.current) {
-                inputRef.current.value = "";
                 inputRef.current.focus();
               }
             }}
@@ -255,7 +268,7 @@ export function CategoryAutocomplete({
         )}
       </AnimatePresence>
 
-      {isOpen && filteredCategories.length === 0 && value && !isLoading && (
+      {isOpen && filteredCategories.length === 0 && inputValue && !isLoading && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

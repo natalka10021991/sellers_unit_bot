@@ -189,3 +189,4 @@ export function ResultCard({ result, onNewCalculation }: ResultCardProps) {
   );
 }
 
+

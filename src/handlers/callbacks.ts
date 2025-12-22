@@ -2,6 +2,7 @@ import type { BotContext } from "../types/index.js";
 import { startCalculation, handleStats } from "./commands.js";
 import { mainMenuKeyboard, subscriptionKeyboard } from "../keyboards/index.js";
 import { config } from "../config/index.js";
+import { logger } from "../utils/logger.js";
 
 /**
  * Обработчик инлайн-кнопок
@@ -40,7 +41,7 @@ export async function handleCallbackQuery(ctx: BotContext): Promise<void> {
       break;
 
     default:
-      console.log("Unknown callback:", callbackData);
+      logger.warn("Unknown callback", { callbackData });
   }
 }
 

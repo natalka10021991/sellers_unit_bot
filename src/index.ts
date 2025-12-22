@@ -8,20 +8,20 @@ const require = createRequire(import.meta.url);
 const dotenv = require("dotenv");
 const result = dotenv.config();
 
+// Импортируем logger до использования
+import { logger } from "./utils/logger.js";
+
 // Если .env файл не найден - это нормально для продакшена
 // Проверяем только наличие обязательных переменных
 if (result.error && result.error.code !== "ENOENT") {
-  console.error("❌ Ошибка загрузки .env:", result.error.message);
+  logger.error("Ошибка загрузки .env", { error: result.error.message });
   // Не выходим, возможно переменные заданы через окружение
 }
 
 if (!process.env.BOT_TOKEN) {
-  console.error("❌ BOT_TOKEN не найден! Проверь переменные окружения.");
+  logger.error("BOT_TOKEN не найден! Проверь переменные окружения.");
   process.exit(1);
 }
-
-// Импортируем logger после загрузки .env
-import { logger } from "./utils/logger.js";
 
 logger.info("✅ .env загружен");
 logger.info("   BOT_TOKEN:", { found: !!process.env.BOT_TOKEN });
@@ -33,6 +33,6 @@ Promise.all([
     module.startAPIServer();
   }),
 ]).catch((err) => {
-  console.error("❌ Ошибка запуска:", err);
+  logger.error("Ошибка запуска", { error: err });
   process.exit(1);
 });
