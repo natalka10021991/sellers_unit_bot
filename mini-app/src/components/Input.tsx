@@ -21,13 +21,6 @@ const getInputColors = () => {
   }
 
   const isDark = tg.colorScheme === 'dark';
-  const params = tg.themeParams || {};
-  
-  // Нормализация цвета
-  const normalizeColor = (color?: string): string => {
-    if (!color) return '';
-    return color.startsWith('#') ? color : `#${color}`;
-  };
 
   if (isDark) {
     // Темная тема Telegram: светлый фон инпута + темный текст
