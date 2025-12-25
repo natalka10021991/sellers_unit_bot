@@ -30,7 +30,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               bg-tg-secondary-bg/80 backdrop-blur-sm
               border-2 border-transparent
               rounded-2xl
-              text-tg-text text-lg font-medium
+              text-lg font-medium
               placeholder:text-tg-hint/50
               focus:border-accent-purple/50
               focus:bg-tg-secondary-bg
@@ -38,8 +38,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               ${error ? "border-red-500/50" : ""}
               ${className}
             `}
-            style={{ 
-              color: 'var(--tg-theme-text-color)',
+            style={{
+              color: 'var(--tg-theme-text-color, #000000)',
             }}
             {...props}
           />

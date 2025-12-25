@@ -75,6 +75,45 @@ export function useTelegram() {
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
     
+    // Функция для нормализации цвета (Telegram может передавать с # или без)
+    const normalizeColor = (color?: string): string | undefined => {
+      if (!color) return undefined;
+      // Если цвет уже начинается с #, возвращаем как есть
+      if (color.startsWith('#')) return color;
+      // Если это hex без #, добавляем #
+      if (/^[0-9A-Fa-f]{6}$/.test(color)) return `#${color}`;
+      // Иначе возвращаем как есть (может быть rgb/rgba)
+      return color;
+    };
+
+    // Функция для применения цветов
+    const applyThemeColors = () => {
+      if (!tg?.themeParams) return;
+      
+      const root = document.documentElement;
+      const bgColor = normalizeColor(tg.themeParams.bg_color);
+      const secondaryBgColor = normalizeColor(tg.themeParams.secondary_bg_color);
+      const textColor = normalizeColor(tg.themeParams.text_color);
+      const hintColor = normalizeColor(tg.themeParams.hint_color);
+      const linkColor = normalizeColor(tg.themeParams.link_color);
+      const buttonColor = normalizeColor(tg.themeParams.button_color);
+      const buttonTextColor = normalizeColor(tg.themeParams.button_text_color);
+
+      if (bgColor) root.style.setProperty('--tg-theme-bg-color', bgColor);
+      if (secondaryBgColor) root.style.setProperty('--tg-theme-secondary-bg-color', secondaryBgColor);
+      if (textColor) {
+        root.style.setProperty('--tg-theme-text-color', textColor);
+        // Применяем цвет напрямую ко всем инпутам
+        document.querySelectorAll('input').forEach((input) => {
+          (input as HTMLElement).style.color = textColor;
+        });
+      }
+      if (hintColor) root.style.setProperty('--tg-theme-hint-color', hintColor);
+      if (linkColor) root.style.setProperty('--tg-theme-link-color', linkColor);
+      if (buttonColor) root.style.setProperty('--tg-theme-button-color', buttonColor);
+      if (buttonTextColor) root.style.setProperty('--tg-theme-button-text-color', buttonTextColor);
+    };
+    
     if (tg) {
       setWebApp(tg);
       setUser(tg.initDataUnsafe.user || null);
@@ -83,30 +122,12 @@ export function useTelegram() {
       tg.ready();
       tg.expand();
       
-      // Применяем цвета из Telegram themeParams
-      if (tg.themeParams) {
-        const root = document.documentElement;
-        if (tg.themeParams.bg_color) {
-          root.style.setProperty('--tg-theme-bg-color', tg.themeParams.bg_color);
-        }
-        if (tg.themeParams.secondary_bg_color) {
-          root.style.setProperty('--tg-theme-secondary-bg-color', tg.themeParams.secondary_bg_color);
-        }
-        if (tg.themeParams.text_color) {
-          root.style.setProperty('--tg-theme-text-color', tg.themeParams.text_color);
-        }
-        if (tg.themeParams.hint_color) {
-          root.style.setProperty('--tg-theme-hint-color', tg.themeParams.hint_color);
-        }
-        if (tg.themeParams.link_color) {
-          root.style.setProperty('--tg-theme-link-color', tg.themeParams.link_color);
-        }
-        if (tg.themeParams.button_color) {
-          root.style.setProperty('--tg-theme-button-color', tg.themeParams.button_color);
-        }
-        if (tg.themeParams.button_text_color) {
-          root.style.setProperty('--tg-theme-button-text-color', tg.themeParams.button_text_color);
-        }
+      // Применяем цвета сразу
+      applyThemeColors();
+      
+      // Слушаем изменения темы
+      if (tg.onEvent) {
+        tg.onEvent('themeChanged', applyThemeColors);
       }
       
       setIsReady(true);
