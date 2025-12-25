@@ -83,9 +83,31 @@ export function useTelegram() {
       tg.ready();
       tg.expand();
       
-      // Устанавливаем цвета
-      tg.setHeaderColor("#1a1a2e");
-      tg.setBackgroundColor("#1a1a2e");
+      // Применяем цвета из Telegram themeParams
+      if (tg.themeParams) {
+        const root = document.documentElement;
+        if (tg.themeParams.bg_color) {
+          root.style.setProperty('--tg-theme-bg-color', tg.themeParams.bg_color);
+        }
+        if (tg.themeParams.secondary_bg_color) {
+          root.style.setProperty('--tg-theme-secondary-bg-color', tg.themeParams.secondary_bg_color);
+        }
+        if (tg.themeParams.text_color) {
+          root.style.setProperty('--tg-theme-text-color', tg.themeParams.text_color);
+        }
+        if (tg.themeParams.hint_color) {
+          root.style.setProperty('--tg-theme-hint-color', tg.themeParams.hint_color);
+        }
+        if (tg.themeParams.link_color) {
+          root.style.setProperty('--tg-theme-link-color', tg.themeParams.link_color);
+        }
+        if (tg.themeParams.button_color) {
+          root.style.setProperty('--tg-theme-button-color', tg.themeParams.button_color);
+        }
+        if (tg.themeParams.button_text_color) {
+          root.style.setProperty('--tg-theme-button-text-color', tg.themeParams.button_text_color);
+        }
+      }
       
       setIsReady(true);
     } else {

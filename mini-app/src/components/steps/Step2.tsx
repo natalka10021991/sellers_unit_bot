@@ -83,26 +83,30 @@ export function Step2({
         </p>
         
         <div className="grid grid-cols-2 gap-3 mb-4">
-          <Input
-            label="Цена за 1 кг в руб."
-            placeholder="0"
-            suffix="₽"
-            value={deliveryPricePerKg}
-            onChange={(e) => onDeliveryPricePerKgChange(e.target.value)}
-            error={errors?.deliveryPricePerKg}
-            type="text"
-            inputMode="decimal"
-          />
-          <Input
-            label="Вес 1 единицы в граммах"
-            placeholder="0"
-            suffix="г"
-            value={weightGrams}
-            onChange={(e) => onWeightGramsChange(e.target.value)}
-            error={errors?.weightGrams}
-            type="text"
-            inputMode="decimal"
-          />
+          <div>
+            <Input
+              label="Цена за 1 кг в руб."
+              placeholder="0"
+              suffix="₽"
+              value={deliveryPricePerKg}
+              onChange={(e) => onDeliveryPricePerKgChange(e.target.value)}
+              error={errors?.deliveryPricePerKg}
+              type="text"
+              inputMode="decimal"
+            />
+          </div>
+          <div>
+            <Input
+              label="Вес 1 ед., г"
+              placeholder="0"
+              suffix="г"
+              value={weightGrams}
+              onChange={(e) => onWeightGramsChange(e.target.value)}
+              error={errors?.weightGrams}
+              type="text"
+              inputMode="decimal"
+            />
+          </div>
         </div>
 
         {/* Поле с результатом расчета */}

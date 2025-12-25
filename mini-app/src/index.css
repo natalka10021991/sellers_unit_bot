@@ -3,12 +3,14 @@
 @tailwind utilities;
 
 :root {
-  --tg-theme-bg-color: #1a1a2e;
-  --tg-theme-secondary-bg-color: #16213e;
-  --tg-theme-text-color: #ffffff;
-  --tg-theme-hint-color: #8b8b8b;
-  --tg-theme-link-color: #6c63ff;
-  --tg-theme-button-color: #6c63ff;
+  /* Telegram WebApp will set these variables automatically */
+  /* Fallback values for development/testing outside Telegram */
+  --tg-theme-bg-color: #ffffff;
+  --tg-theme-secondary-bg-color: #f1f1f1;
+  --tg-theme-text-color: #000000;
+  --tg-theme-hint-color: #999999;
+  --tg-theme-link-color: #2481cc;
+  --tg-theme-button-color: #2481cc;
   --tg-theme-button-text-color: #ffffff;
 }
 
@@ -30,7 +32,7 @@ body {
 }
 
 body {
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
+  background: var(--tg-theme-bg-color);
 }
 
 /* Custom scrollbar */

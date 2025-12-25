@@ -38,6 +38,9 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               ${error ? "border-red-500/50" : ""}
               ${className}
             `}
+            style={{ 
+              color: 'var(--tg-theme-text-color)',
+            }}
             {...props}
           />
           {suffix && (
