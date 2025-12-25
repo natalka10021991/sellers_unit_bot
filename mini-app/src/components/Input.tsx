@@ -2,7 +2,7 @@ import { InputHTMLAttributes, forwardRef } from "react";
 import { motion } from "framer-motion";
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
-  label: string;
+  label?: string;
   icon?: string;
   suffix?: string;
   error?: string;
@@ -16,10 +16,12 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         animate={{ opacity: 1, y: 0 }}
         className="mb-4"
       >
-        <label className="block text-sm font-medium text-tg-hint mb-2">
-          {icon && <span className="mr-2">{icon}</span>}
-          {label}
-        </label>
+        {label && (
+          <label className="block text-sm font-medium text-tg-hint mb-2">
+            {icon && <span className="mr-2">{icon}</span>}
+            {label}
+          </label>
+        )}
         <div className="relative">
           <input
             ref={ref}
