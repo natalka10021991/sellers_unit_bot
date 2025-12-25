@@ -39,7 +39,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               ${className}
             `}
             style={{
-              color: 'var(--tg-theme-text-color, #000000)',
+              color: 'var(--tg-theme-text-color)',
             }}
             {...props}
           />

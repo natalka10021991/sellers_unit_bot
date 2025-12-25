@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 :root {
-  /* Telegram WebApp will set these variables automatically */
-  /* Fallback values for development/testing outside Telegram */
+  /* Telegram WebApp автоматически устанавливает эти переменные при загрузке */
+  /* Fallback значения используются только при разработке вне Telegram */
   --tg-theme-bg-color: #ffffff;
   --tg-theme-secondary-bg-color: #f1f1f1;
   --tg-theme-text-color: #000000;
