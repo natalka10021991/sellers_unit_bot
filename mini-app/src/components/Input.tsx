@@ -1,4 +1,4 @@
-import { InputHTMLAttributes, forwardRef } from "react";
+import { InputHTMLAttributes, forwardRef, useMemo } from "react";
 import { motion } from "framer-motion";
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -8,8 +8,48 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   error?: string;
 }
 
+// Функция для определения темы и получения правильных цветов для инпутов
+// Согласно требованиям: светлая тема = темный фон + светлый текст, темная тема = светлый фон + темный текст
+const getInputColors = () => {
+  const tg = window.Telegram?.WebApp;
+  if (!tg) {
+    // Fallback для разработки (темная тема)
+    return {
+      bg: '#1a1a2e',
+      text: '#ffffff',
+    };
+  }
+
+  const isDark = tg.colorScheme === 'dark';
+  const params = tg.themeParams || {};
+  
+  // Нормализация цвета
+  const normalizeColor = (color?: string): string => {
+    if (!color) return '';
+    return color.startsWith('#') ? color : `#${color}`;
+  };
+
+  if (isDark) {
+    // Темная тема Telegram: светлый фон инпута + темный текст
+    // Используем светлый цвет для фона инпута (инверсия основного фона)
+    return {
+      bg: '#ffffff', // Светлый фон
+      text: '#000000', // Темный текст
+    };
+  } else {
+    // Светлая тема Telegram: темный фон инпута + светлый текст
+    // Используем темный цвет для фона инпута (инверсия основного фона)
+    return {
+      bg: '#1a1a2e', // Темный фон
+      text: '#ffffff', // Светлый текст
+    };
+  }
+};
+
 export const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ label, icon, suffix, error, className = "", ...props }, ref) => {
+    const inputColors = useMemo(() => getInputColors(), []);
+
     return (
       <motion.div
         initial={{ opacity: 0, y: 10 }}
@@ -27,19 +67,18 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             ref={ref}
             className={`
               w-full px-4 py-3.5 
-              bg-tg-secondary-bg/80 backdrop-blur-sm
               border-2 border-transparent
               rounded-2xl
               text-lg font-medium
               placeholder:text-tg-hint/50
               focus:border-accent-purple/50
-              focus:bg-tg-secondary-bg
               transition-all duration-200
               ${error ? "border-red-500/50" : ""}
               ${className}
             `}
             style={{
-              color: 'var(--tg-theme-text-color)',
+              backgroundColor: inputColors.bg,
+              color: inputColors.text,
             }}
             {...props}
           />
