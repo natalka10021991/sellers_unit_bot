@@ -157,22 +157,155 @@ export class WBAPIService {
   }
 
   /**
+   * Поиск категорий по названию товара
+   * GET /content/v2/object/all?name={productName}
+   * Возвращает уникальные родительские категории для найденных предметов
+   */
+  async searchCategoriesByProductName(productName: string): Promise<WBParentCategory[]> {
+    if (!this.token) {
+      throw new Error("WB API токен не установлен");
+    }
+
+    if (!productName || productName.trim().length < 2) {
+      return []; // Минимум 2 символа для поиска
+    }
+
+    try {
+      const response = await fetch(
+        `${this.baseUrl}/content/v2/object/all?name=${encodeURIComponent(productName.trim())}&limit=100`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: this.token,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `WB API Error: ${response.status} ${response.statusText} - ${errorText}`
+        );
+      }
+
+      const responseData = (await response.json()) as {
+        data?: Array<{
+          subjectID: number;
+          parentID: number;
+          subjectName: string;
+          parentName: string;
+        }>;
+        error?: boolean;
+        errorText?: string;
+      };
+
+      if (responseData.error || !responseData.data) {
+        throw new Error(
+          responseData.errorText || "Не удалось найти категории"
+        );
+      }
+
+      // Извлекаем уникальные родительские категории
+      const uniqueCategories = new Map<number, WBParentCategory>();
+      
+      for (const item of responseData.data) {
+        if (!uniqueCategories.has(item.parentID)) {
+          uniqueCategories.set(item.parentID, {
+            id: item.parentID,
+            name: item.parentName,
+          });
+        }
+      }
+
+      const categories = Array.from(uniqueCategories.values());
+      logger.debug("Категории найдены по названию товара", { 
+        productName, 
+        count: categories.length 
+      });
+      
+      return categories;
+    } catch (error: any) {
+      logger.error("Ошибка при поиске категорий по названию товара", error, { productName });
+      throw new Error(`Не удалось найти категории: ${error.message}`);
+    }
+  }
+
+  /**
    * Получить комиссию для категории
-   * Это примерная логика - точный endpoint нужно уточнить в документации WB
+   * GET /api/v1/tariffs/commission
+   * Возвращает комиссию маркетплейса (kgvpMarketplace) для указанной категории
    */
   async getCommissionForCategory(categoryId: number): Promise<number> {
-    // TODO: Найти точный endpoint для комиссий в документации WB
-    // Пока возвращаем стандартные значения по категориям
-    
-    // Примерные комиссии по категориям (нужно уточнить из API)
-    const defaultCommissions: Record<number, number> = {
-      // Электроника - обычно 15%
-      // Одежда - обычно 18-20%
-      // Бытовая техника - обычно 15-17%
-      // Красота - обычно 20-25%
-    };
+    if (!this.token) {
+      throw new Error("WB API токен не установлен");
+    }
 
-    return defaultCommissions[categoryId] || 18; // По умолчанию 18%
+    try {
+      // Используем common-api.wildberries.ru для тарифов
+      const response = await fetch(
+        `https://common-api.wildberries.ru/api/v1/tariffs/commission?locale=ru`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: this.token,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `WB API Error: ${response.status} ${response.statusText} - ${errorText}`
+        );
+      }
+
+      const responseData = (await response.json()) as {
+        report?: Array<{
+          parentID: number;
+          parentName: string;
+          subjectID?: number;
+          subjectName?: string;
+          kgvpMarketplace: number;
+          kgvpBooking?: number;
+          kgvpPickup?: number;
+          kgvpSupplier?: number;
+        }>;
+      };
+
+      if (!responseData.report || responseData.report.length === 0) {
+        throw new Error("Не удалось получить данные о комиссиях");
+      }
+
+      // Ищем комиссию для указанной категории (parentID)
+      const categoryCommission = responseData.report.find(
+        (item) => item.parentID === categoryId
+      );
+
+      if (!categoryCommission) {
+        logger.warn("Комиссия для категории не найдена", { categoryId });
+        // Возвращаем среднюю комиссию маркетплейса или значение по умолчанию
+        const avgCommission = responseData.report.reduce(
+          (sum, item) => sum + item.kgvpMarketplace,
+          0
+        ) / responseData.report.length;
+        return avgCommission || 18;
+      }
+
+      // Возвращаем комиссию маркетплейса (kgvpMarketplace)
+      const commission = categoryCommission.kgvpMarketplace;
+      logger.debug("Комиссия для категории получена", { 
+        categoryId, 
+        commission,
+        categoryName: categoryCommission.parentName 
+      });
+      
+      return commission;
+    } catch (error: any) {
+      logger.error("Ошибка при получении комиссии для категории", error, { categoryId });
+      throw new Error(`Не удалось получить комиссию: ${error.message}`);
+    }
   }
 
   /**

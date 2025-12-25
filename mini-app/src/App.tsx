@@ -1,18 +1,38 @@
 import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTelegram } from "./hooks/useTelegram";
-import { Input } from "./components/Input";
+import { useDebounce } from "./hooks/useDebounce";
 import { Button } from "./components/Button";
+import { Step1 } from "./components/steps/Step1";
+import { Step2 } from "./components/steps/Step2";
+import { Step3 } from "./components/steps/Step3";
+import { Step4 } from "./components/steps/Step4";
 import { ResultCard } from "./components/ResultCard";
-import { CategoryAutocomplete } from "./components/CategoryAutocomplete";
+import { STORAGE_COST } from "./constants/calculations";
 
+// Расширенная структура данных формы
 interface FormData {
+  // Шаг 1
+  productName: string;
   category: string;
-  costPrice: string;
+  categoryId: number | null;
+
+  // Шаг 2
+  purchasePrice: string;
+  deliveryPricePerKg: string;
+  weightGrams: string;
+  packagingCost: string;
+  otherExpenses: string;
+
+  // Шаг 3
+  commission: string;
+  commissionPercent: string;
+  logisticsCost: string;
+  storageCost: string;
+  returnPercent: string;
+
+  // Шаг 4
   sellingPrice: string;
-  wbCommission: string;
-  logistics: string;
-  storage: string;
 }
 
 interface MarginResult {
@@ -30,30 +50,33 @@ interface MarginResult {
 }
 
 const initialFormData: FormData = {
+  productName: "",
   category: "",
-  costPrice: "",
+  categoryId: null,
+  purchasePrice: "",
+  deliveryPricePerKg: "",
+  weightGrams: "",
+  packagingCost: "",
+  otherExpenses: "",
+  commission: "",
+  commissionPercent: "15",
+  logisticsCost: "",
+  storageCost: "",
+  returnPercent: "",
   sellingPrice: "",
-  wbCommission: "15",
-  logistics: "",
-  storage: "",
 };
 
 // URL API бота
-// В Telegram Mini App нельзя использовать localhost
 const getApiUrl = () => {
-  // Если задан через переменную окружения - используем его (приоритет)
   if (import.meta.env.VITE_API_URL) {
     const url = import.meta.env.VITE_API_URL.trim();
-    // Убираем слэш в конце, если есть
     return url.endsWith("/") ? url.slice(0, -1) : url;
   }
-  
-  // Если открыто в браузере (localhost) - используем localhost
+
   if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
     return "http://localhost:3000";
   }
-  
-  // В Telegram Mini App (продакшен) - можно получить URL бота из start_param
+
   const tg = window.Telegram?.WebApp;
   if (tg?.initDataUnsafe?.start_param) {
     const startParam = tg.initDataUnsafe.start_param;
@@ -61,12 +84,7 @@ const getApiUrl = () => {
       return startParam.endsWith("/") ? startParam.slice(0, -1) : startParam;
     }
   }
-  
-  // Fallback: если не задан VITE_API_URL, возвращаем пустую строку
-  // Это означает, что API будет недоступен, но приложение не сломается
-  console.warn(
-    "⚠️ VITE_API_URL не задан! Создай файл mini-app/.env с переменной VITE_API_URL=https://твой-бот-url.railway.app"
-  );
+
   return "";
 };
 
@@ -74,113 +92,353 @@ const API_URL = getApiUrl();
 
 export default function App() {
   const { user, isReady, hapticFeedback } = useTelegram();
+  const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [result, setResult] = useState<MarginResult | null>(null);
-  const [errors, setErrors] = useState<Partial<FormData>>({});
-  const [isCalculating, setIsCalculating] = useState(false);
+  const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
+  const [isSearchingCategories, setIsSearchingCategories] = useState(false);
+  const [foundCategories, setFoundCategories] = useState<Array<{ id: number; name: string }>>([]);
 
-  // Валидация формы
-  const validateForm = useCallback((): boolean => {
-    const newErrors: Partial<FormData> = {};
+  // Debounce для поиска категорий (500ms задержка, минимум 2 символа)
+  const debouncedProductName = useDebounce(formData.productName, 500);
 
-    if (!formData.costPrice || parseFloat(formData.costPrice) <= 0) {
-      newErrors.costPrice = "Введите себестоимость";
-    }
-    if (!formData.sellingPrice || parseFloat(formData.sellingPrice) <= 0) {
-      newErrors.sellingPrice = "Введите цену продажи";
-    }
-    if (
-      !formData.wbCommission ||
-      parseFloat(formData.wbCommission) < 0 ||
-      parseFloat(formData.wbCommission) > 100
-    ) {
-      newErrors.wbCommission = "Комиссия от 0 до 100%";
-    }
-    if (!formData.logistics || parseFloat(formData.logistics) < 0) {
-      newErrors.logistics = "Введите стоимость логистики";
-    }
-    if (!formData.storage || parseFloat(formData.storage) < 0) {
-      newErrors.storage = "Введите стоимость хранения";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  }, [formData]);
-
-  // Расчет маржи
-  const calculateMargin = useCallback(() => {
-    if (!validateForm()) {
-      hapticFeedback("error");
-      return;
-    }
-
-    setIsCalculating(true);
-    hapticFeedback("medium");
-
-    // Имитируем небольшую задержку для анимации
-    setTimeout(() => {
-      const costPrice = parseFloat(formData.costPrice);
-      const sellingPrice = parseFloat(formData.sellingPrice);
-      const wbCommission = parseFloat(formData.wbCommission);
-      const logistics = parseFloat(formData.logistics);
-      const storage = parseFloat(formData.storage);
-
-      const revenue = sellingPrice;
-      const commissionAmount = (sellingPrice * wbCommission) / 100;
-      const totalCosts = costPrice + commissionAmount + logistics + storage;
-      const profit = revenue - totalCosts;
-      const marginPercent = revenue > 0 ? (profit / revenue) * 100 : 0;
-      const markup =
-        costPrice > 0 ? ((sellingPrice - costPrice) / costPrice) * 100 : 0;
-
-      setResult({
-        costPrice,
-        sellingPrice,
-        wbCommission,
-        logistics,
-        storage,
-        revenue,
-        commissionAmount,
-        totalCosts,
-        profit,
-        marginPercent,
-        markup,
-      });
-
-      setIsCalculating(false);
-      hapticFeedback("success");
-    }, 300);
-  }, [formData, validateForm, hapticFeedback]);
-
-  // Сброс формы
-  const resetForm = useCallback(() => {
-    setFormData(initialFormData);
+  // Функция для сброса данных шагов 2-4
+  const resetSteps2To4 = useCallback(() => {
+    setFormData((prev) => ({
+      ...prev,
+      // Шаг 2
+      purchasePrice: "",
+      deliveryPricePerKg: "",
+      weightGrams: "",
+      packagingCost: "",
+      otherExpenses: "",
+      // Шаг 3
+      commission: "0.00",
+      logisticsCost: "",
+      storageCost: "",
+      returnPercent: "",
+      // Шаг 4
+      sellingPrice: "",
+    }));
     setResult(null);
-    setErrors({});
-    hapticFeedback("light");
-  }, [hapticFeedback]);
+    // Сбрасываем ошибки для всех полей кроме шага 1
+    setErrors((prev) => {
+      const newErrors = { ...prev };
+      delete newErrors.purchasePrice;
+      delete newErrors.deliveryPricePerKg;
+      delete newErrors.weightGrams;
+      delete newErrors.packagingCost;
+      delete newErrors.otherExpenses;
+      delete newErrors.commission;
+      delete newErrors.commissionPercent;
+      delete newErrors.logisticsCost;
+      delete newErrors.storageCost;
+      delete newErrors.returnPercent;
+      delete newErrors.sellingPrice;
+      return newErrors;
+    });
+  }, []);
 
-  // Обновление поля формы
-  const handleInputChange = (field: keyof FormData, value: string) => {
-    // Разрешаем только числа и точку
-    const sanitized = value.replace(/[^0-9.,]/g, "").replace(",", ".");
-    setFormData((prev) => ({ ...prev, [field]: sanitized }));
+  // Загрузка комиссии для категории
+  const loadCommissionForCategory = useCallback(async (categoryId: number) => {
+    try {
+      const url = `${API_URL}/api/commission/${categoryId}`;
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const data = await response.json();
+
+      if (data.success && data.data) {
+        const commissionPercent = data.data.commission;
+
+        setFormData((prev) => ({
+          ...prev,
+          commissionPercent: commissionPercent.toString(),
+          // Комиссию в рублях рассчитываем только от цены продажи, поэтому пока оставляем 0.00
+          commission: "0.00",
+        }));
+      }
+    } catch (err) {
+      // Ошибка загрузки комиссии - игнорируем
+    }
+  }, []);
+
+  // Обработка выбора категории
+  const handleCategoryChange = useCallback((category: { id: number; name: string } | null) => {
+    setFormData((prev) => {
+      // Проверяем, были ли заполнены данные шагов 2-4
+      const hasSteps2To4Data =
+        prev.purchasePrice ||
+        prev.deliveryPricePerKg ||
+        prev.weightGrams ||
+        prev.packagingCost ||
+        prev.otherExpenses ||
+        prev.logisticsCost ||
+        prev.storageCost ||
+        prev.returnPercent ||
+        prev.sellingPrice;
+
+      // Если данные шагов 2-4 были заполнены, сбрасываем их
+      if (hasSteps2To4Data) {
+        resetSteps2To4();
+        if (currentStep > 1) {
+          setCurrentStep(1);
+        }
+      }
+
+      if (category) {
+        return {
+          ...prev,
+          category: category.name,
+          categoryId: category.id,
+          commissionPercent: "",
+          commission: "0.00",
+        };
+      } else {
+        return {
+          ...prev,
+          category: "",
+          categoryId: null,
+          commissionPercent: "",
+          commission: "0.00",
+        };
+      }
+    });
+
+    // Загружаем комиссию после обновления состояния
+    if (category) {
+      loadCommissionForCategory(category.id);
+    }
+  }, [currentStep, resetSteps2To4, loadCommissionForCategory]);
+
+  // Обработка выбора категории из найденных
+  const handleCategorySelect = useCallback((category: { id: number; name: string }) => {
+    handleCategoryChange(category);
+    setFoundCategories([]);
+  }, [handleCategoryChange]);
+
+  // Поиск категорий по названию товара
+  useEffect(() => {
+    const searchCategories = async () => {
+      if (!debouncedProductName || debouncedProductName.trim().length < 2) {
+        setFoundCategories([]);
+        return;
+      }
+
+      setIsSearchingCategories(true);
+      try {
+        const response = await fetch(
+          `${API_URL}/api/categories/search?name=${encodeURIComponent(debouncedProductName.trim())}`
+        );
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (data.success && data.data) {
+          setFoundCategories(data.data);
+
+          // Если найдена только одна категория - автоматически выбираем её
+          if (data.data.length === 1) {
+            handleCategorySelect(data.data[0]);
+          }
+        } else {
+          setFoundCategories([]);
+        }
+      } catch (err) {
+        setFoundCategories([]);
+      } finally {
+        setIsSearchingCategories(false);
+      }
+    };
+
+    searchCategories();
+  }, [debouncedProductName, handleCategorySelect]);
+
+  // Обработчики изменений полей
+  const handleFieldChange = (field: keyof FormData, value: string) => {
+    // Если изменяется название товара или категория, проверяем наличие данных шагов 2-4
+    if (field === "productName" || field === "category") {
+      const hasSteps2To4Data =
+        formData.purchasePrice ||
+        formData.deliveryPricePerKg ||
+        formData.weightGrams ||
+        formData.packagingCost ||
+        formData.otherExpenses ||
+        formData.logisticsCost ||
+        formData.storageCost ||
+        formData.returnPercent ||
+        formData.sellingPrice;
+
+      if (hasSteps2To4Data) {
+        resetSteps2To4();
+        // Если мы не на шаге 1, возвращаемся на него
+        if (currentStep > 1) {
+          setCurrentStep(1);
+        }
+      }
+    }
+
+    setFormData((prev) => {
+      const newData = { ...prev, [field]: value };
+
+      // Если изменилась цена продажи, пересчитываем комиссию в рублях
+      if (field === "sellingPrice") {
+        const sellingPrice = parseFloat(value) || 0;
+        const commissionPercent = parseFloat(prev.commissionPercent) || 0;
+        const commissionAmount = (sellingPrice * commissionPercent) / 100;
+        newData.commission = commissionAmount.toFixed(2);
+      }
+
+      return newData;
+    });
+
     // Убираем ошибку при изменении
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: undefined }));
     }
   };
 
-  // Keyboard handling
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Enter" && !result) {
-        calculateMargin();
+  // Валидация шага
+  const validateStep = (step: number): boolean => {
+    const newErrors: Partial<Record<keyof FormData, string>> = {};
+
+    if (step === 1) {
+      if (!formData.productName.trim()) {
+        newErrors.productName = "Введите название товара";
       }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [calculateMargin, result]);
+      if (!formData.category) {
+        newErrors.category = "Выберите категорию";
+      }
+    } else if (step === 2) {
+      if (!formData.purchasePrice || parseFloat(formData.purchasePrice) <= 0) {
+        newErrors.purchasePrice = "Введите стоимость закупки";
+      }
+    } else if (step === 3) {
+      if (!formData.commissionPercent || parseFloat(formData.commissionPercent) < 0) {
+        newErrors.commissionPercent = "Комиссия должна быть указана";
+      }
+    } else if (step === 4) {
+      if (!formData.sellingPrice || parseFloat(formData.sellingPrice) <= 0) {
+        newErrors.sellingPrice = "Введите цену продажи";
+      }
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // Навигация между шагами
+  const handleNext = () => {
+    if (validateStep(currentStep)) {
+      if (currentStep < 4) {
+        const nextStep = currentStep + 1;
+
+        // При переходе на шаг 3 автоматически рассчитываем стоимость хранения
+        if (nextStep === 3 && !formData.storageCost) {
+          setFormData((prev) => ({
+            ...prev,
+            storageCost: STORAGE_COST,
+          }));
+        }
+
+        setCurrentStep(nextStep);
+        hapticFeedback("light");
+      }
+    } else {
+      hapticFeedback("error");
+    }
+  };
+
+  const handleBack = () => {
+    if (currentStep > 1) {
+      const prevStep = currentStep - 1;
+
+      // При переходе на шаг 3 автоматически рассчитываем стоимость хранения, если еще не рассчитана
+      if (prevStep === 3 && !formData.storageCost) {
+        setFormData((prev) => ({
+          ...prev,
+          storageCost: STORAGE_COST,
+        }));
+      }
+
+      setCurrentStep(prevStep);
+      hapticFeedback("light");
+    }
+  };
+
+  // Расчет маржи
+  const calculateMargin = useCallback(() => {
+    if (!validateStep(4)) {
+      hapticFeedback("error");
+      return;
+    }
+
+    hapticFeedback("medium");
+
+    const purchasePrice = parseFloat(formData.purchasePrice) || 0;
+    const deliveryCost = formData.deliveryPricePerKg && formData.weightGrams
+      ? ((parseFloat(formData.deliveryPricePerKg) || 0) * (parseFloat(formData.weightGrams) || 0)) / 1000
+      : 0;
+    const packagingCost = parseFloat(formData.packagingCost) || 0;
+    const otherExpenses = parseFloat(formData.otherExpenses) || 0;
+    const sellingPrice = parseFloat(formData.sellingPrice);
+    const commissionPercent = parseFloat(formData.commissionPercent) || 0;
+    const commissionAmount = (sellingPrice * commissionPercent) / 100;
+    const logisticsCost = parseFloat(formData.logisticsCost) || 0;
+    const storageCost = parseFloat(formData.storageCost) || 0;
+    const returnPercent = parseFloat(formData.returnPercent) || 0;
+    const returnCost = (sellingPrice * returnPercent) / 100;
+
+    const totalCosts = purchasePrice + deliveryCost + packagingCost + otherExpenses + commissionAmount + logisticsCost + returnCost + storageCost;
+    const profit = sellingPrice - totalCosts;
+    const marginPercent = sellingPrice > 0 ? (profit / sellingPrice) * 100 : 0;
+    const markup = purchasePrice > 0 ? ((sellingPrice - purchasePrice) / purchasePrice) * 100 : 0;
+
+    setResult({
+      costPrice: purchasePrice + deliveryCost + packagingCost + otherExpenses,
+      sellingPrice,
+      wbCommission: commissionPercent,
+      logistics: logisticsCost,
+      storage: storageCost,
+      revenue: sellingPrice,
+      commissionAmount,
+      totalCosts,
+      profit,
+      marginPercent,
+      markup,
+    });
+
+    hapticFeedback("success");
+  }, [formData, hapticFeedback]);
+
+  // Сброс формы
+  const resetForm = useCallback(() => {
+    setFormData(initialFormData);
+    setResult(null);
+    setErrors({});
+    setCurrentStep(1);
+    setFoundCategories([]);
+    hapticFeedback("light");
+  }, [hapticFeedback]);
+
+  // Обработка изменения комиссии
+  const handleCommissionChange = useCallback((commission: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      commissionPercent: commission.toString(),
+      // Пересчитываем комиссию в рублях, если есть цена продажи
+      commission: prev.sellingPrice
+        ? ((parseFloat(prev.sellingPrice) * commission) / 100).toFixed(2)
+        : "0.00",
+    }));
+  }, []);
 
   if (!isReady) {
     return (
@@ -190,6 +448,48 @@ export default function App() {
     );
   }
 
+  // Если есть результат, показываем карточку результата
+  if (result) {
+    return (
+      <div className="min-h-screen pb-8">
+        <motion.header
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="sticky top-0 z-50 px-4 py-4 backdrop-blur-xl bg-tg-bg/80"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-accent-purple to-accent-pink flex items-center justify-center">
+              <span className="text-xl">📊</span>
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-tg-text">WB Маржа</h1>
+              <p className="text-xs text-tg-hint">
+                {user ? `Привет, ${user.first_name}!` : "Калькулятор маржи"}
+              </p>
+            </div>
+          </div>
+        </motion.header>
+
+        <main className="px-4 pt-2">
+          <ResultCard result={result} onNewCalculation={resetForm} />
+        </main>
+      </div>
+    );
+  }
+
+  // Рассчитываем данные для Step4
+  const costData = {
+    purchasePrice: parseFloat(formData.purchasePrice) || 0,
+    deliveryCost: formData.deliveryPricePerKg && formData.weightGrams
+      ? ((parseFloat(formData.deliveryPricePerKg) || 0) * (parseFloat(formData.weightGrams) || 0)) / 1000
+      : 0,
+    packagingCost: parseFloat(formData.packagingCost) || 0,
+    otherExpenses: parseFloat(formData.otherExpenses) || 0,
+    logisticsCost: parseFloat(formData.logisticsCost) || 0,
+    returnPercent: parseFloat(formData.returnPercent) || 0,
+    storageCost: parseFloat(formData.storageCost) || 0,
+  };
+
   return (
     <div className="min-h-screen pb-8">
       {/* Header */}
@@ -198,158 +498,138 @@ export default function App() {
         animate={{ opacity: 1, y: 0 }}
         className="sticky top-0 z-50 px-4 py-4 backdrop-blur-xl bg-tg-bg/80"
       >
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-accent-purple to-accent-pink flex items-center justify-center">
-            <span className="text-xl">📊</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-accent-purple to-accent-pink flex items-center justify-center">
+              <span className="text-xl">📊</span>
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-tg-text">WB Маржа</h1>
+              <p className="text-xs text-tg-hint">
+                Шаг {currentStep} из 4
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-lg font-bold text-tg-text">WB Маржа</h1>
-            <p className="text-xs text-tg-hint">
-              {user ? `Привет, ${user.first_name}!` : "Калькулятор маржи"}
-            </p>
-          </div>
+          {currentStep > 1 && (
+            <button
+              type="button"
+              onClick={handleBack}
+              className="px-3 py-1.5 text-sm text-tg-hint hover:text-tg-text transition-colors"
+            >
+              ← Назад
+            </button>
+          )}
         </div>
       </motion.header>
+
+      {/* Progress Bar */}
+      <div className="px-4 mb-4">
+        <div className="h-1 bg-tg-secondary-bg rounded-full overflow-hidden">
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${(currentStep / 4) * 100}%` }}
+            transition={{ duration: 0.3 }}
+            className="h-full bg-gradient-to-r from-accent-purple to-accent-pink"
+          />
+        </div>
+      </div>
 
       {/* Content */}
       <main className="px-4 pt-2">
         <AnimatePresence mode="wait">
-          {result ? (
-            <motion.div
-              key="result"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-            >
-              <ResultCard result={result} onNewCalculation={resetForm} />
-            </motion.div>
-          ) : (
-            <motion.div
-              key="form"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="space-y-2"
-            >
-              {/* Info Card */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-accent-purple/10 to-accent-pink/10 border border-accent-purple/20"
-              >
-                <p className="text-sm text-tg-hint">
-                  💡 Введите данные о товаре для расчета маржи и рентабельности
-                  продаж на Wildberries
-                </p>
-              </motion.div>
+          {currentStep === 1 && (
+            <Step1
+              key="step1"
+              productName={formData.productName}
+              category={formData.category}
+              onProductNameChange={(value) => handleFieldChange("productName", value)}
+              onCategoryChange={handleCategoryChange}
+              onCommissionChange={handleCommissionChange}
+              foundCategories={foundCategories}
+              isSearchingCategories={isSearchingCategories}
+              onCategorySelect={handleCategorySelect}
+              apiUrl={API_URL}
+              errors={{
+                productName: errors.productName,
+                category: errors.category,
+              }}
+            />
+          )}
 
-              {/* Form */}
-              {/* Категория товара с autocomplete */}
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                <CategoryAutocomplete
-                  value={formData.category}
-                  onChange={(category) => {
-                    setFormData((prev) => ({
-                      ...prev,
-                      category: category?.name || "",
-                    }));
-                  }}
-                  onCommissionChange={(commission) => {
-                    setFormData((prev) => ({
-                      ...prev,
-                      wbCommission: commission.toString(),
-                    }));
-                    // Убираем ошибку комиссии при автозаполнении
-                    if (errors.wbCommission) {
-                      setErrors((prev) => ({ ...prev, wbCommission: undefined }));
-                    }
-                  }}
-                  apiUrl={API_URL}
-                  error={errors.category}
-                />
-              </motion.div>
+          {currentStep === 2 && (
+            <Step2
+              key="step2"
+              purchasePrice={formData.purchasePrice}
+              deliveryPricePerKg={formData.deliveryPricePerKg}
+              weightGrams={formData.weightGrams}
+              packagingCost={formData.packagingCost}
+              otherExpenses={formData.otherExpenses}
+              onPurchasePriceChange={(value) => handleFieldChange("purchasePrice", value)}
+              onDeliveryPricePerKgChange={(value) => handleFieldChange("deliveryPricePerKg", value)}
+              onWeightGramsChange={(value) => handleFieldChange("weightGrams", value)}
+              onPackagingCostChange={(value) => handleFieldChange("packagingCost", value)}
+              onOtherExpensesChange={(value) => handleFieldChange("otherExpenses", value)}
+              errors={{
+                purchasePrice: errors.purchasePrice,
+                deliveryPricePerKg: errors.deliveryPricePerKg,
+                weightGrams: errors.weightGrams,
+                packagingCost: errors.packagingCost,
+                otherExpenses: errors.otherExpenses,
+              }}
+            />
+          )}
 
-              <Input
-                label="Себестоимость"
-                icon="💰"
-                placeholder="Например: 500"
-                suffix="₽"
-                value={formData.costPrice}
-                onChange={(e) => handleInputChange("costPrice", e.target.value)}
-                error={errors.costPrice}
-                type="text"
-                inputMode="decimal"
-              />
+          {currentStep === 3 && (
+            <Step3
+              key="step3"
+              commissionPercent={formData.commissionPercent}
+              logisticsCost={formData.logisticsCost}
+              storageCost={formData.storageCost}
+              returnPercent={formData.returnPercent}
+              onLogisticsCostChange={(value) => handleFieldChange("logisticsCost", value)}
+              onReturnPercentChange={(value) => handleFieldChange("returnPercent", value)}
+              errors={{
+                commission: errors.commission,
+                logisticsCost: errors.logisticsCost,
+                storageCost: errors.storageCost,
+                returnPercent: errors.returnPercent,
+              }}
+            />
+          )}
 
-              <Input
-                label="Цена продажи на WB"
-                icon="🏷️"
-                placeholder="Например: 1500"
-                suffix="₽"
-                value={formData.sellingPrice}
-                onChange={(e) => handleInputChange("sellingPrice", e.target.value)}
-                error={errors.sellingPrice}
-                type="text"
-                inputMode="decimal"
-              />
-
-              <Input
-                label="Комиссия Wildberries"
-                icon="📊"
-                placeholder="15-25% (заполняется автоматически)"
-                suffix="%"
-                value={formData.wbCommission}
-                onChange={(e) => handleInputChange("wbCommission", e.target.value)}
-                error={errors.wbCommission}
-                type="text"
-                inputMode="decimal"
-              />
-
-              <Input
-                label="Логистика"
-                icon="🚚"
-                placeholder="Доставка до покупателя"
-                suffix="₽"
-                value={formData.logistics}
-                onChange={(e) => handleInputChange("logistics", e.target.value)}
-                error={errors.logistics}
-                type="text"
-                inputMode="decimal"
-              />
-
-              <Input
-                label="Хранение"
-                icon="📦"
-                placeholder="За период продажи"
-                suffix="₽"
-                value={formData.storage}
-                onChange={(e) => handleInputChange("storage", e.target.value)}
-                error={errors.storage}
-                type="text"
-                inputMode="decimal"
-              />
-
-              {/* Submit Button */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="pt-4"
-              >
-                <Button
-                  size="lg"
-                  onClick={calculateMargin}
-                  loading={isCalculating}
-                >
-                  Рассчитать маржу
-                </Button>
-              </motion.div>
-            </motion.div>
+          {currentStep === 4 && (
+            <Step4
+              key="step4"
+              sellingPrice={formData.sellingPrice}
+              commissionPercent={formData.commissionPercent}
+              productName={formData.productName}
+              category={formData.category}
+              onSellingPriceChange={(value) => handleFieldChange("sellingPrice", value)}
+              costData={{
+                ...costData,
+                returnPercent: parseFloat(formData.returnPercent) || 0,
+              }}
+              onCalculate={calculateMargin}
+              result={null}
+              onNewCalculation={resetForm}
+              errors={{
+                sellingPrice: errors.sellingPrice,
+              }}
+            />
           )}
         </AnimatePresence>
+
+        {/* Navigation Buttons */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="pt-6 pb-4"
+        >
+          <Button size="lg" onClick={handleNext}>
+            {currentStep === 4 ? "Рассчитать маржу" : "Далее"}
+          </Button>
+        </motion.div>
       </main>
 
       {/* Footer */}

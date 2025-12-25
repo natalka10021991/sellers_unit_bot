@@ -106,6 +106,42 @@ export function createAPIServer(): Express {
   });
 
   /**
+   * GET /api/categories/search?name={productName}
+   * Поиск категорий по названию товара
+   */
+  app.get("/api/categories/search", async (req: Request, res: Response) => {
+    try {
+      const productName = req.query.name as string;
+      
+      if (!productName || productName.trim().length < 2) {
+        return res.status(400).json({
+          success: false,
+          error: "Название товара должно содержать минимум 2 символа",
+        });
+      }
+
+      const categories = await wbApiService.searchCategoriesByProductName(productName.trim());
+      
+      const formatted = categories.map((cat) => ({
+        id: cat.id,
+        name: cat.name,
+      }));
+
+      res.json({
+        success: true,
+        data: formatted,
+        count: formatted.length,
+      });
+    } catch (error: any) {
+      logger.error("Ошибка в /api/categories/search", error, { productName: req.query.name });
+      res.status(500).json({
+        success: false,
+        error: error.message || "Не удалось найти категории",
+      });
+    }
+  });
+
+  /**
    * GET /api/commission/:categoryId
    * Получить комиссию для категории
    */
@@ -171,6 +207,7 @@ export function startAPIServer(): void {
       endpoints: [
         "GET /health",
         "GET /api/categories",
+        "GET /api/categories/search?name={productName}",
         "GET /api/categories/:id/subjects",
         "GET /api/commission/:categoryId",
       ],

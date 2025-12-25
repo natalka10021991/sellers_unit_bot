@@ -174,6 +174,6 @@ export function closeDatabase(): void {
   try {
     db.close();
   } catch (error) {
-    console.error("Ошибка при закрытии БД:", error);
+    // Ошибка при закрытии БД - игнорируем
   }
 }

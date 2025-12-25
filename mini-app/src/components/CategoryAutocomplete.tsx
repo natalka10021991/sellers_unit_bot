@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface Category {
@@ -13,6 +13,7 @@ interface CategoryAutocompleteProps {
   onCommissionChange?: (commission: number) => void;
   apiUrl?: string;
   error?: string;
+  suggestedCategories?: Array<{ id: number; name: string }>;
 }
 
 export function CategoryAutocomplete({
@@ -21,9 +22,9 @@ export function CategoryAutocomplete({
   onCommissionChange,
   apiUrl = "http://localhost:3000",
   error,
+  suggestedCategories,
 }: CategoryAutocompleteProps) {
   const [categories, setCategories] = useState<Category[]>([]);
-  const [filteredCategories, setFilteredCategories] = useState<Category[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
@@ -31,33 +32,67 @@ export function CategoryAutocomplete({
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // Фильтруем категории с помощью useMemo (без useEffect)
+  const filteredCategories = useMemo(() => {
+    // Не фильтруем, если категория уже выбрана
+    if (selectedCategory && inputValue === selectedCategory.name) {
+      return categories;
+    }
+
+    if (inputValue.trim() === "") {
+      return categories;
+    }
+
+    return categories.filter((cat) =>
+      cat.name.toLowerCase().includes(inputValue.toLowerCase())
+    );
+  }, [inputValue, categories, selectedCategory]);
+
   // Загружаем категории при монтировании
   useEffect(() => {
     loadCategories();
   }, []);
 
-  // Синхронизируем inputValue с внешним value
+  // Если переданы предложенные категории (из поиска по названию товара), используем их
   useEffect(() => {
-    if (!selectedCategory) {
+    if (suggestedCategories && suggestedCategories.length > 0) {
+      const mappedCategories: Category[] = suggestedCategories.map((cat) => ({
+        id: cat.id,
+        name: cat.name,
+        parent: "",
+      }));
+      setCategories(mappedCategories);
+    }
+  }, [suggestedCategories]);
+
+  // Синхронизируем inputValue с внешним value и закрываем список
+  useEffect(() => {
+    // Если value изменился и не пустой - закрываем список и обновляем состояние
+    if (value && value.trim() !== "") {
       setInputValue(value);
+
+      // Ищем категорию в списках (если они уже загружены)
+      const foundCategory = categories.find((cat) => cat.name === value);
+      if (foundCategory) {
+        setSelectedCategory(foundCategory);
+      }
+
+      // ВСЕГДА закрываем список при установке value извне
+      setIsOpen(false);
+      // Используем setTimeout чтобы гарантировать закрытие после всех обновлений
+      setTimeout(() => {
+        inputRef.current?.blur();
+        setIsOpen(false); // Дополнительная проверка
+      }, 0);
+    } else if (!value || value.trim() === "") {
+      setInputValue(value);
+      setSelectedCategory(null);
+      setIsOpen(false);
     }
-  }, [value, selectedCategory]);
+  }, [value]);
 
-  // Фильтруем категории при изменении значения
-  useEffect(() => {
-    if (inputValue.trim() === "") {
-      setFilteredCategories(categories.slice(0, 10)); // Показываем первые 10
-      return;
-    }
 
-    const filtered = categories
-      .filter((cat) =>
-        cat.name.toLowerCase().includes(inputValue.toLowerCase())
-      )
-      .slice(0, 10); // Ограничиваем 10 результатами
 
-    setFilteredCategories(filtered);
-  }, [inputValue, categories]);
 
   // Закрываем dropdown при клике вне компонента
   useEffect(() => {
@@ -79,11 +114,8 @@ export function CategoryAutocomplete({
   const loadCategories = async () => {
     // Если API URL не задан или пустой - пропускаем загрузку, но показываем компонент
     if (!apiUrl || apiUrl === "" || (apiUrl.includes("localhost") && window.location.hostname !== "localhost")) {
-      console.warn("API URL не настроен для Telegram Mini App. Категории будут недоступны, но можно ввести вручную.");
       setIsLoading(false);
-      // Показываем пустой список, чтобы пользователь мог ввести категорию вручную
       setCategories([]);
-      setFilteredCategories([]);
       return;
     }
 
@@ -104,20 +136,11 @@ export function CategoryAutocomplete({
 
       if (data.success) {
         setCategories(data.data);
-        setFilteredCategories(data.data.slice(0, 10));
       } else {
-        console.error("Ошибка загрузки категорий:", data.error);
-        // Если API недоступен, показываем компонент, но без категорий
-        // Пользователь все равно может ввести категорию вручную
         setCategories([]);
-        setFilteredCategories([]);
       }
     } catch (err: any) {
-      console.error("Ошибка при загрузке категорий:", err);
-      console.warn("Компонент будет работать в режиме ручного ввода");
-      // Не скрываем компонент при ошибке - пользователь может ввести вручную
       setCategories([]);
-      setFilteredCategories([]);
     } finally {
       setIsLoading(false);
     }
@@ -143,7 +166,7 @@ export function CategoryAutocomplete({
             onCommissionChange(data.data.commission);
           }
         } catch (err) {
-          console.error("Ошибка при загрузке комиссии:", err);
+          // Ошибка загрузки комиссии - игнорируем
         }
       }
     },
@@ -153,17 +176,23 @@ export function CategoryAutocomplete({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     setInputValue(newValue);
-    
+
     // Если пользователь изменил текст, сбрасываем выбранную категорию
     if (selectedCategory && newValue !== selectedCategory.name) {
       setSelectedCategory(null);
       onChange(null);
     }
-    
-    setIsOpen(true);
+
+    // Открываем список при вводе
+    setIsOpen(newValue.trim() !== "");
   };
 
   const handleInputFocus = () => {
+    // Не открываем список, если категория уже выбрана или value установлен
+    if (selectedCategory || (value && value.trim() !== "")) {
+      setIsOpen(false);
+      return;
+    }
     setIsOpen(true);
   };
 
@@ -245,7 +274,8 @@ export function CategoryAutocomplete({
               absolute z-50 w-full mt-2
               bg-tg-secondary-bg border border-white/10
               rounded-2xl shadow-xl
-              max-h-64 overflow-y-auto
+              max-h-80 overflow-y-auto
+              overscroll-contain
             "
           >
             {filteredCategories.map((category) => (
