@@ -1,6 +1,31 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
+// Функция для определения темы и получения правильных цветов для инпутов
+const getInputColors = () => {
+  const tg = window.Telegram?.WebApp;
+  if (!tg) {
+    return {
+      bg: '#1a1a2e',
+      text: '#ffffff',
+    };
+  }
+
+  const isDark = tg.colorScheme === 'dark';
+
+  if (isDark) {
+    return {
+      bg: '#ffffff',
+      text: '#000000',
+    };
+  } else {
+    return {
+      bg: '#1a1a2e',
+      text: '#ffffff',
+    };
+  }
+};
+
 interface Category {
   id: number;
   name: string;
@@ -31,6 +56,7 @@ export function CategoryAutocomplete({
   const [inputValue, setInputValue] = useState<string>(value);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const inputColors = useMemo(() => getInputColors(), []);
 
   // Фильтруем категории с помощью useMemo (без useEffect)
   const filteredCategories = useMemo(() => {
@@ -213,17 +239,19 @@ export function CategoryAutocomplete({
           placeholder="Начните вводить название категории..."
           className={`
             w-full px-4 py-3.5 
-            bg-tg-secondary-bg/80 backdrop-blur-sm
             border-2 border-transparent
             rounded-2xl
-            text-tg-text text-lg font-medium
+            text-lg font-medium
             placeholder:text-tg-hint/50
             focus:border-accent-purple/50
-            focus:bg-tg-secondary-bg
             transition-all duration-200
             ${error ? "border-red-500/50" : ""}
             ${isLoading ? "opacity-50" : ""}
           `}
+          style={{
+            backgroundColor: inputColors.bg,
+            color: inputColors.text,
+          }}
           disabled={isLoading}
         />
 
