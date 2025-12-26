@@ -4,24 +4,27 @@ import { motion, AnimatePresence } from "framer-motion";
 // Функция для определения темы и получения правильных цветов для инпутов
 const getInputColors = () => {
   const tg = window.Telegram?.WebApp;
-  if (!tg) {
-    return {
-      bg: '#1a1a2e',
-      text: '#ffffff',
-    };
+  
+  // Определяем тему: сначала из Telegram, потом из системных настроек браузера
+  let isDark: boolean;
+  if (tg) {
+    isDark = tg.colorScheme === 'dark';
+  } else {
+    // Fallback: используем системную тему браузера
+    isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   }
-
-  const isDark = tg.colorScheme === 'dark';
 
   if (isDark) {
     return {
-      bg: '#ffffff',
-      text: '#000000',
+      bg: '#ffffff', // Светлый фон (инверсия темного фона)
+      text: '#000000', // Темный текст (инверсия светлого текста)
+      border: '#e9e9e9',
     };
   } else {
     return {
-      bg: '#1a1a2e',
-      text: '#ffffff',
+      bg: 'rgb(243 243 243)', // Темный фон (инверсия светлого фона)
+      text: '#000000', // Светлый текст (инверсия темного текста)
+      border: '#e9e9e9',
     };
   }
 };

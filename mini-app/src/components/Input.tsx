@@ -12,15 +12,15 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 // Согласно требованиям: светлая тема = темный фон + светлый текст, темная тема = светлый фон + темный текст
 const getInputColors = () => {
   const tg = window.Telegram?.WebApp;
-  if (!tg) {
-    // Fallback для разработки (темная тема)
-    return {
-      bg: '#1a1a2e',
-      text: '#ffffff',
-    };
+  
+  // Определяем тему: сначала из Telegram, потом из системных настроек браузера
+  let isDark: boolean;
+  if (tg) {
+    isDark = tg.colorScheme === 'dark';
+  } else {
+    // Fallback: используем системную тему браузера
+    isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   }
-
-  const isDark = tg.colorScheme === 'dark';
 
   if (isDark) {
     // Темная тема Telegram: светлый фон инпута + темный текст
@@ -28,13 +28,15 @@ const getInputColors = () => {
     return {
       bg: '#ffffff', // Светлый фон (инверсия темного фона)
       text: '#000000', // Темный текст (инверсия светлого текста)
+      border: '#e9e9e9',
     };
   } else {
     // Светлая тема Telegram: темный фон инпута + светлый текст
     // Инвертируем: используем темный фон (как bg темной темы) и светлый текст
     return {
-      bg: '#1a1a2e', // Темный фон (инверсия светлого фона)
-      text: '#ffffff', // Светлый текст (инверсия темного текста)
+      bg: 'rgb(243 243 243)', // Темный фон (инверсия светлого фона)
+      text: '#000000', // Светлый текст (инверсия темного текста)
+      border: '#e9e9e9',
     };
   }
 };
@@ -72,6 +74,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             style={{
               backgroundColor: inputColors.bg,
               color: inputColors.text,
+              borderColor: inputColors.border,
             }}
             {...props}
           />

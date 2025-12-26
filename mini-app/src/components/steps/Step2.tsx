@@ -1,15 +1,19 @@
-import { motion } from "framer-motion";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "../Input";
+import { Button } from "../Button";
 
 interface Step2Props {
   purchasePrice: string;
   deliveryPricePerKg: string;
   weightGrams: string;
+  deliveryToYou: string;
   packagingCost: string;
   otherExpenses: string;
   onPurchasePriceChange: (value: string) => void;
   onDeliveryPricePerKgChange: (value: string) => void;
   onWeightGramsChange: (value: string) => void;
+  onDeliveryToYouChange?: (value: string) => void;
   onPackagingCostChange: (value: string) => void;
   onOtherExpensesChange: (value: string) => void;
   errors?: {
@@ -25,20 +29,50 @@ export function Step2({
   purchasePrice,
   deliveryPricePerKg,
   weightGrams,
+  deliveryToYou,
   packagingCost,
   otherExpenses,
   onPurchasePriceChange,
   onDeliveryPricePerKgChange,
   onWeightGramsChange,
+  onDeliveryToYouChange,
   onPackagingCostChange,
   onOtherExpensesChange,
   errors,
 }: Step2Props) {
+  const [isDeliverySaved, setIsDeliverySaved] = useState(false);
+
   // Рассчитываем стоимость доставки
-  const calculatedDelivery = 
-    deliveryPricePerKg && weightGrams
-      ? ((parseFloat(deliveryPricePerKg) || 0) * (parseFloat(weightGrams) || 0)) / 1000
-      : 0;
+  const calculateDelivery = () => {
+    if (deliveryPricePerKg && weightGrams) {
+      const price = parseFloat(deliveryPricePerKg) || 0;
+      const weight = parseFloat(weightGrams) || 0;
+      const result = (price * weight) / 1000;
+      return result.toFixed(2);
+    }
+    return "";
+  };
+
+  const handleSaveDelivery = () => {
+    if (deliveryPricePerKg && weightGrams) {
+      const result = calculateDelivery();
+      if (result && onDeliveryToYouChange) {
+        onDeliveryToYouChange(result);
+      }
+      setIsDeliverySaved(true);
+    }
+  };
+
+  // Сбрасываем состояние сохранения при изменении полей
+  const handleDeliveryPriceChange = (value: string) => {
+    setIsDeliverySaved(false);
+    onDeliveryPricePerKgChange(value);
+  };
+
+  const handleWeightChange = (value: string) => {
+    setIsDeliverySaved(false);
+    onWeightGramsChange(value);
+  };
 
   return (
     <motion.div
@@ -71,25 +105,23 @@ export function Step2({
           type="text"
           inputMode="decimal"
         />
-        <p className="text-xs text-tg-hint mt-1 ml-2">
-          Стоимость на сайте поставщика
-        </p>
+
       </div>
 
       {/* Стоимость доставки до вас */}
       <div>
-        <p className="text-xs text-tg-hint mb-3">
+        <p className="text-sm text-tg-hint mb-3">
           Стоимость доставки из Китая, Киргизии, стран СНГ и т.д.
         </p>
-        
-        <div className="grid grid-cols-2 gap-3 mb-4">
+
+        <div className="grid grid-cols-2 gap-3 mb-3">
           <div>
             <Input
               label="Цена за 1 кг в руб."
               placeholder="0"
               suffix="₽"
               value={deliveryPricePerKg}
-              onChange={(e) => onDeliveryPricePerKgChange(e.target.value)}
+              onChange={(e) => handleDeliveryPriceChange(e.target.value)}
               error={errors?.deliveryPricePerKg}
               type="text"
               inputMode="decimal"
@@ -101,7 +133,7 @@ export function Step2({
               placeholder="0"
               suffix="г"
               value={weightGrams}
-              onChange={(e) => onWeightGramsChange(e.target.value)}
+              onChange={(e) => handleWeightChange(e.target.value)}
               error={errors?.weightGrams}
               type="text"
               inputMode="decimal"
@@ -109,18 +141,35 @@ export function Step2({
           </div>
         </div>
 
-        {/* Поле с результатом расчета */}
-        <Input
-          label="Стоимость доставки до вас"
-          icon="🚚"
-          placeholder="0"
-          suffix="₽"
-          value={calculatedDelivery > 0 ? calculatedDelivery.toFixed(2) : ""}
-          onChange={() => {}} // Read-only
-          type="text"
-          inputMode="decimal"
-          readOnly
-        />
+        <div className="flex items-center justify-end mb-4">
+          <Button
+            size="sm"
+            onClick={handleSaveDelivery}
+            disabled={!deliveryPricePerKg || !weightGrams}
+          >
+            Сохранить
+          </Button>
+        </div>
+
+        {/* Стоимость доставки до вас - показывается после сохранения */}
+        <AnimatePresence>
+          {(isDeliverySaved || deliveryToYou) && (deliveryToYou || calculateDelivery()) && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="mb-4"
+            >
+              <div className="p-3 rounded-xl bg-tg-secondary-bg/80">
+                <p className="text-lg text-tg-hint">
+                  Стоимость доставки до вас - <span className="text-lg font-bold text-tg-text">
+                    {deliveryToYou || calculateDelivery()} ₽
+                  </span>
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Расходы на упаковку и доставку до склада WB */}

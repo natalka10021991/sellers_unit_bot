@@ -4,14 +4,27 @@
 
 :root {
   /* Telegram WebApp автоматически устанавливает эти переменные */
-  /* Fallback значения для разработки вне Telegram (темная тема) */
-  --tg-theme-bg-color: #1a1a2e;
-  --tg-theme-secondary-bg-color: #16213e;
-  --tg-theme-text-color: #ffffff;
-  --tg-theme-hint-color: #8b8b8b;
-  --tg-theme-link-color: #6c63ff;
-  --tg-theme-button-color: #6c63ff;
+  /* Fallback значения для разработки вне Telegram - светлая тема по умолчанию */
+  --tg-theme-bg-color: #ffffff;
+  --tg-theme-secondary-bg-color: #f1f1f1;
+  --tg-theme-text-color: #000000;
+  --tg-theme-hint-color: #999999;
+  --tg-theme-link-color: #2481cc;
+  --tg-theme-button-color: #2481cc;
   --tg-theme-button-text-color: #ffffff;
+}
+
+/* Адаптация к системной теме для локальной разработки */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --tg-theme-bg-color: #1a1a2e;
+    --tg-theme-secondary-bg-color: #16213e;
+    --tg-theme-text-color: #ffffff;
+    --tg-theme-hint-color: #8b8b8b;
+    --tg-theme-link-color: #6c63ff;
+    --tg-theme-button-color: #6c63ff;
+    --tg-theme-button-text-color: #ffffff;
+  }
 }
 
 * {

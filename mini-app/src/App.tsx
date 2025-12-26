@@ -16,11 +16,19 @@ interface FormData {
   productName: string;
   category: string;
   categoryId: number | null;
+  packageLength: string;
+  packageWidth: string;
+  packageHeight: string;
+  packageVolume: string; // Рассчитывается автоматически
+  taxationType: string; // УСН "Доходы", УСН "Доходы-расходы", НПД, ОСН, Другое
+  taxRate: string; // 6%, 15%, 25%, Не учитывать, или кастомное значение
+  customTaxRate: string; // Для "Другое"
 
   // Шаг 2
   purchasePrice: string;
   deliveryPricePerKg: string;
   weightGrams: string;
+  deliveryToYou: string; // Рассчитывается автоматически
   packagingCost: string;
   otherExpenses: string;
 
@@ -53,9 +61,17 @@ const initialFormData: FormData = {
   productName: "",
   category: "",
   categoryId: null,
+  packageLength: "",
+  packageWidth: "",
+  packageHeight: "",
+  packageVolume: "",
+  taxationType: "",
+  taxRate: "",
+  customTaxRate: "",
   purchasePrice: "",
   deliveryPricePerKg: "",
   weightGrams: "",
+  deliveryToYou: "",
   packagingCost: "",
   otherExpenses: "",
   commission: "",
@@ -110,6 +126,7 @@ export default function App() {
       purchasePrice: "",
       deliveryPricePerKg: "",
       weightGrams: "",
+      deliveryToYou: "",
       packagingCost: "",
       otherExpenses: "",
       // Шаг 3
@@ -549,6 +566,20 @@ export default function App() {
               isSearchingCategories={isSearchingCategories}
               onCategorySelect={handleCategorySelect}
               apiUrl={API_URL}
+              packageLength={formData.packageLength}
+              packageWidth={formData.packageWidth}
+              packageHeight={formData.packageHeight}
+              packageVolume={formData.packageVolume}
+              taxationType={formData.taxationType}
+              taxRate={formData.taxRate}
+              customTaxRate={formData.customTaxRate}
+              onPackageLengthChange={(value) => handleFieldChange("packageLength", value)}
+              onPackageWidthChange={(value) => handleFieldChange("packageWidth", value)}
+              onPackageHeightChange={(value) => handleFieldChange("packageHeight", value)}
+              onPackageVolumeChange={(value) => handleFieldChange("packageVolume", value)}
+              onTaxationTypeChange={(value) => handleFieldChange("taxationType", value)}
+              onTaxRateChange={(value) => handleFieldChange("taxRate", value)}
+              onCustomTaxRateChange={(value) => handleFieldChange("customTaxRate", value)}
               errors={{
                 productName: errors.productName,
                 category: errors.category,
@@ -562,11 +593,13 @@ export default function App() {
               purchasePrice={formData.purchasePrice}
               deliveryPricePerKg={formData.deliveryPricePerKg}
               weightGrams={formData.weightGrams}
+              deliveryToYou={formData.deliveryToYou}
               packagingCost={formData.packagingCost}
               otherExpenses={formData.otherExpenses}
               onPurchasePriceChange={(value) => handleFieldChange("purchasePrice", value)}
               onDeliveryPricePerKgChange={(value) => handleFieldChange("deliveryPricePerKg", value)}
               onWeightGramsChange={(value) => handleFieldChange("weightGrams", value)}
+              onDeliveryToYouChange={(value) => handleFieldChange("deliveryToYou", value)}
               onPackagingCostChange={(value) => handleFieldChange("packagingCost", value)}
               onOtherExpensesChange={(value) => handleFieldChange("otherExpenses", value)}
               errors={{
