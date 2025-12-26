@@ -25,6 +25,37 @@ export function Step3({
   onReturnPercentChange,
   errors,
 }: Step3Props) {
+  // Функция для определения темы и получения правильных цветов для инпутов/дропдаунов
+  // Согласно требованиям: светлая тема = темный фон + светлый текст, темная тема = светлый фон + темный текст
+  const getInputColors = () => {
+    const tg = window.Telegram?.WebApp;
+    
+    // Определяем тему: сначала из Telegram, потом из системных настроек браузера
+    let isDark: boolean;
+    if (tg) {
+      isDark = tg.colorScheme === 'dark';
+    } else {
+      // Fallback: используем системную тему браузера
+      isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+
+    if (isDark) {
+      // Темная тема Telegram: светлый фон инпута + темный текст
+      return {
+        bg: '#ffffff',
+        text: '#000000',
+        border: '#e9e9e9',
+      };
+    } else {
+      // Светлая тема Telegram: темный фон инпута + светлый текст
+      return {
+        bg: 'rgb(243 243 243)',
+        text: '#000000',
+        border: '#e9e9e9',
+      };
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, x: -20 }}
@@ -74,9 +105,19 @@ export function Step3({
             placeholder="Выбрать склад"
             value={logisticsCost ? `${logisticsCost} руб` : ""}
             readOnly
-            className="w-full px-4 py-3.5 bg-tg-secondary-bg/80 backdrop-blur-sm border-2 border-transparent rounded-2xl text-tg-text text-lg font-medium placeholder:text-tg-hint/50 focus:border-accent-purple/50 focus:bg-tg-secondary-bg transition-all duration-200"
+            className="w-full px-4 py-3.5 backdrop-blur-sm border-2 rounded-2xl text-lg font-medium placeholder:text-tg-hint/50 transition-all duration-200"
+            style={{
+              backgroundColor: getInputColors().bg,
+              color: getInputColors().text,
+              borderColor: getInputColors().border,
+            }}
           />
-          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-tg-hint">▼</span>
+          <span 
+            className="absolute right-4 top-1/2 -translate-y-1/2"
+            style={{ color: getInputColors().text, opacity: 0.6 }}
+          >
+            ▼
+          </span>
         </div>
         {logisticsCost && (
           <p className="text-xs text-tg-hint mt-1 ml-2">
