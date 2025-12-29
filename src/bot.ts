@@ -116,18 +116,18 @@ bot.command("start", async (ctx) => {
   ctx.session = undefined;
 
   // Сразу открываем Mini App через кнопку
-  const inlineKeyboard = new InlineKeyboard().webApp("📱 Открыть калькулятор", MINI_APP_URL);
+  const inlineKeyboard = new InlineKeyboard().webApp("Начать расчет", MINI_APP_URL);
 
   // Добавляем постоянную клавиатуру с Mini App кнопкой
   const mainKeyboard = getMainKeyboard(MINI_APP_URL);
 
   await ctx.reply(
-    `👋 Привет, <b>${user.first_name}</b>!\n\n` +
-      `Я помогу рассчитать <b>маржу товара</b> для Wildberries.\n\n` +
-      `📊 Что я умею:\n` +
-      `• Рассчитывать чистую прибыль\n` +
-      `• Показывать маржу и наценку\n` +
-      `• Давать рекомендации по рентабельности\n\n` +
+    `👋 <b>Привет!</b>\n\n` +
+      `Я помогу посчитать <b>маржинальность товара на WB</b> и Ozon\n\n` +
+      `📊 <b>Что я умею:</b>\n` +
+      `• считаю чистую прибыль\n` +
+      `• учитываю комиссии, логистику и возвраты\n` +
+      `• показываю, выгоден ли товар\n\n` +
       `🎁 У тебя есть <b>${config.freeCalculationsLimit} бесплатных расчетов</b>!\n\n` +
       `Нажми кнопку ниже или используй меню для быстрого доступа.`,
     {
@@ -154,7 +154,7 @@ bot.command("restart", async (ctx) => {
   getOrCreateUser(user.id, user.first_name, user.username);
 
   const keyboard = getMainKeyboard(MINI_APP_URL);
-  const inlineKeyboard = new InlineKeyboard().webApp("📱 Открыть калькулятор", MINI_APP_URL);
+  const inlineKeyboard = new InlineKeyboard().webApp("Начать расчет", MINI_APP_URL);
 
   await ctx.reply(
     `🔄 <b>Бот перезапущен!</b>\n\n` +
@@ -440,7 +440,7 @@ bot.hears(["🔄 Перезапустить", "🔄 Перезапустить �
   getOrCreateUser(user.id, user.first_name, user.username);
 
   const keyboard = getMainKeyboard(MINI_APP_URL);
-  const inlineKeyboard = new InlineKeyboard().webApp("📱 Открыть калькулятор", MINI_APP_URL);
+  const inlineKeyboard = new InlineKeyboard().webApp("Начать расчет", MINI_APP_URL);
 
   await ctx.reply(
     `🔄 <b>Бот перезапущен!</b>\n\n` +
