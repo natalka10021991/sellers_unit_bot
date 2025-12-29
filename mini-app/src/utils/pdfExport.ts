@@ -12,6 +12,7 @@ interface CalculationData {
   commissionPercent: number;
   logisticsCost: number;
   returnPercent: number;
+  returnCostPerUnit: number;
   storageCost: number;
   sellingPrice: number;
   profit: number;
@@ -77,7 +78,7 @@ export async function exportToPDF(data: CalculationData): Promise<void> {
       </tr>
       <tr>
         <td style="padding: 5px 0;">Возвраты (${data.returnPercent}%)</td>
-        <td style="text-align: right; padding: 5px 0;">${formatMoney((data.sellingPrice * data.returnPercent) / 100)} ₽</td>
+        <td style="text-align: right; padding: 5px 0;">${formatMoney((data.returnPercent / 100) * data.returnCostPerUnit)} ₽</td>
       </tr>
       <tr>
         <td style="padding: 5px 0;">Хранение</td>

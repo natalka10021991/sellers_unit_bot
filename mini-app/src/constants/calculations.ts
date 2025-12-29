@@ -7,3 +7,4 @@ export const STORAGE_COST_PER_DAY = 0.16;
 export const STORAGE_DAYS = 30;
 export const STORAGE_COST = (STORAGE_COST_PER_DAY * STORAGE_DAYS).toFixed(2);
 
+

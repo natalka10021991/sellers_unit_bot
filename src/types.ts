@@ -49,3 +49,4 @@ export type CalculationStep =
   | 'complete';       // Расчет завершен
 
 
+

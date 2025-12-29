@@ -1,4 +1,5 @@
-import { motion } from "framer-motion";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "../Input";
 import { STORAGE_COST, STORAGE_COST_PER_DAY, STORAGE_DAYS } from "../../constants/calculations";
 
@@ -7,13 +8,16 @@ interface Step3Props {
   logisticsCost: string;
   storageCost: string;
   returnPercent: string;
+  returnCostPerUnit: string;
   onLogisticsCostChange: (value: string) => void;
   onReturnPercentChange: (value: string) => void;
+  onReturnCostPerUnitChange: (value: string) => void;
   errors?: {
     commission?: string;
     logisticsCost?: string;
     storageCost?: string;
     returnPercent?: string;
+    returnCostPerUnit?: string;
   };
 }
 
@@ -22,9 +26,14 @@ export function Step3({
   logisticsCost,
   storageCost,
   returnPercent,
+  returnCostPerUnit,
   onReturnPercentChange,
+  onReturnCostPerUnitChange,
   errors,
 }: Step3Props) {
+  const [showLogisticsPopup, setShowLogisticsPopup] = useState(false);
+  const [showReturnPercentPopup, setShowReturnPercentPopup] = useState(false);
+
   // Функция для определения темы и получения правильных цветов для инпутов/дропдаунов
   // Согласно требованиям: светлая тема = темный фон + светлый текст, темная тема = светлый фон + темный текст
   const getInputColors = () => {
@@ -95,15 +104,44 @@ export function Step3({
 
       {/* Стоимость логистики */}
       <div>
-        <label className="block text-sm font-medium text-tg-hint mb-2">
-          <span className="mr-2">🚚</span>
-          Стоимость логистики
-        </label>
+        <div className="flex items-center gap-2 mb-2">
+          <label className="block text-sm font-medium text-tg-hint">
+            <span className="mr-2">🚚</span>
+            Стоимость логистики
+          </label>
+          <button
+            type="button"
+            onClick={() => setShowLogisticsPopup(!showLogisticsPopup)}
+            className="w-5 h-5 rounded-full bg-tg-hint/20 flex items-center justify-center text-xs text-tg-hint hover:bg-tg-hint/30 transition-colors"
+            title="Информация о расчете логистики"
+          >
+            ?
+          </button>
+        </div>
+        
+        {/* Попап с информацией о расчете логистики */}
+        <AnimatePresence>
+          {showLogisticsPopup && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="mb-3 p-4 bg-accent-purple/10 rounded-xl border border-accent-purple/20"
+            >
+              <p className="text-xs text-tg-hint space-y-1">
+                <div>70 ₽ - средняя цена за первый литр товара</div>
+                <div>21 ₽ - средняя цена за дополнительный литр</div>
+                <div>1,5 - среднее значение коэффициента склада (152%)</div>
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div className="relative">
           <input
             type="text"
-            placeholder="Выбрать склад"
-            value={logisticsCost ? `${logisticsCost} руб` : ""}
+            placeholder="Рассчитывается автоматически"
+            value={logisticsCost ? `${logisticsCost} ₽` : ""}
             readOnly
             className="w-full px-4 py-3.5 backdrop-blur-sm border-2 rounded-2xl text-lg font-medium placeholder:text-tg-hint/50 transition-all duration-200"
             style={{
@@ -112,21 +150,12 @@ export function Step3({
               borderColor: getInputColors().border,
             }}
           />
-          <span 
-            className="absolute right-4 top-1/2 -translate-y-1/2"
-            style={{ color: getInputColors().text, opacity: 0.6 }}
-          >
-            ▼
-          </span>
         </div>
         {logisticsCost && (
           <p className="text-xs text-tg-hint mt-1 ml-2">
-            рассчитано с учетом габаритов товара
+            Рассчитано с учетом габаритов товара
           </p>
         )}
-        <p className="text-xs text-tg-hint mt-2 ml-2">
-          ⚠️ Выбор склада и расчет логистики будут доступны позже
-        </p>
       </div>
 
       {/* % возврата */}
@@ -138,12 +167,31 @@ export function Step3({
           </label>
           <button
             type="button"
+            onClick={() => setShowReturnPercentPopup(!showReturnPercentPopup)}
             className="w-5 h-5 rounded-full bg-tg-hint/20 flex items-center justify-center text-xs text-tg-hint hover:bg-tg-hint/30 transition-colors"
-            title="Рассчитано на основе средних показателей для выбранной категории. Вы можете указать свой процент, если знаете фактический выкуп."
+            title="Информация о проценте возврата"
           >
             ?
           </button>
         </div>
+        
+        {/* Попап с информацией о проценте возврата */}
+        <AnimatePresence>
+          {showReturnPercentPopup && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="mb-3 p-4 bg-accent-purple/10 rounded-xl border border-accent-purple/20"
+            >
+              <p className="text-xs text-tg-hint space-y-1">
+                <div>На категорию одежды возврат 50-80%</div>
+                <div>На товарную категорию 20-50%</div>
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <Input
           placeholder="Введите %"
           suffix="%"
@@ -156,6 +204,24 @@ export function Step3({
         <p className="text-xs text-tg-hint mt-1 ml-2">
           Рассчитано на основе средних показателей для выбранной категории
         </p>
+        
+        {/* Стоимость возврата 1 единицы товара */}
+        <div className="mt-3">
+          <Input
+            label="Стоимость возврата 1 единицы товара"
+            icon="💰"
+            placeholder="50"
+            suffix="₽"
+            value={returnCostPerUnit}
+            onChange={(e) => onReturnCostPerUnitChange(e.target.value)}
+            error={errors?.returnCostPerUnit}
+            type="text"
+            inputMode="decimal"
+          />
+          <p className="text-xs text-tg-hint mt-1 ml-2">
+            Расходы на возврат рассчитываются как: (процент возврата / 100) × стоимость возврата 1 единицы
+          </p>
+        </div>
       </div>
 
       {/* Стоимость хранения */}

@@ -38,6 +38,7 @@ interface FormData {
   logisticsCost: string;
   storageCost: string;
   returnPercent: string;
+  returnCostPerUnit: string; // Стоимость возврата 1 единицы товара (руб)
 
   // Шаг 4
   sellingPrice: string;
@@ -79,6 +80,7 @@ const initialFormData: FormData = {
   logisticsCost: "",
   storageCost: "",
   returnPercent: "",
+  returnCostPerUnit: "50", // По умолчанию 50 рублей
   sellingPrice: "",
 };
 
@@ -134,6 +136,7 @@ export default function App() {
       logisticsCost: "",
       storageCost: "",
       returnPercent: "",
+      returnCostPerUnit: "50",
       // Шаг 4
       sellingPrice: "",
     }));
@@ -151,6 +154,7 @@ export default function App() {
       delete newErrors.logisticsCost;
       delete newErrors.storageCost;
       delete newErrors.returnPercent;
+      delete newErrors.returnCostPerUnit;
       delete newErrors.sellingPrice;
       return newErrors;
     });
@@ -197,6 +201,7 @@ export default function App() {
         prev.logisticsCost ||
         prev.storageCost ||
         prev.returnPercent ||
+        prev.returnCostPerUnit ||
         prev.sellingPrice;
 
       // Если данные шагов 2-4 были заполнены, сбрасываем их
@@ -278,6 +283,42 @@ export default function App() {
     searchCategories();
   }, [debouncedProductName, handleCategorySelect]);
 
+  // Расчет стоимости логистики на основе объема товара
+  const calculateLogisticsCost = useCallback((volumeInLiters: number): number => {
+    // Формула: ((70 * 1) + (дополнительные_литры * 21)) * 1.5
+    // 70 руб - средняя цена за первый литр товара
+    // 21 руб - средняя цена за дополнительный литр
+    // 1.5 - среднее значение коэффициента склада (152%)
+    const firstLiterCost = 70;
+    const additionalLiterCost = 21;
+    const warehouseCoefficient = 1.5;
+    
+    const additionalLiters = Math.max(0, volumeInLiters - 1);
+    const logisticsCost = ((firstLiterCost * 1) + (additionalLiters * additionalLiterCost)) * warehouseCoefficient;
+    
+    return Math.round(logisticsCost);
+  }, []);
+
+  // Автоматический пересчет логистики при изменении объема товара
+  useEffect(() => {
+    if (formData.packageVolume) {
+      const volumeInLiters = parseFloat(formData.packageVolume) || 0;
+      if (volumeInLiters > 0) {
+        const logisticsCost = calculateLogisticsCost(volumeInLiters);
+        setFormData((prev) => {
+          // Обновляем только если значение изменилось
+          if (prev.logisticsCost !== logisticsCost.toString()) {
+            return { ...prev, logisticsCost: logisticsCost.toString() };
+          }
+          return prev;
+        });
+      } else if (formData.logisticsCost) {
+        // Если объем стал 0 или пустой, очищаем логистику
+        setFormData((prev) => ({ ...prev, logisticsCost: "" }));
+      }
+    }
+  }, [formData.packageVolume, calculateLogisticsCost]);
+
   // Обработчики изменений полей
   const handleFieldChange = (field: keyof FormData, value: string) => {
     // Если изменяется название товара или категория, проверяем наличие данных шагов 2-4
@@ -291,6 +332,7 @@ export default function App() {
         formData.logisticsCost ||
         formData.storageCost ||
         formData.returnPercent ||
+        formData.returnCostPerUnit ||
         formData.sellingPrice;
 
       if (hasSteps2To4Data) {
@@ -311,6 +353,17 @@ export default function App() {
         const commissionPercent = parseFloat(prev.commissionPercent) || 0;
         const commissionAmount = (sellingPrice * commissionPercent) / 100;
         newData.commission = commissionAmount.toFixed(2);
+      }
+
+      // Если изменился объем товара, пересчитываем стоимость логистики
+      if (field === "packageVolume") {
+        const volumeInLiters = parseFloat(value) || 0;
+        if (volumeInLiters > 0) {
+          const logisticsCost = calculateLogisticsCost(volumeInLiters);
+          newData.logisticsCost = logisticsCost.toString();
+        } else {
+          newData.logisticsCost = "";
+        }
       }
 
       return newData;
@@ -357,12 +410,31 @@ export default function App() {
       if (currentStep < 4) {
         const nextStep = currentStep + 1;
 
-        // При переходе на шаг 3 автоматически рассчитываем стоимость хранения
-        if (nextStep === 3 && !formData.storageCost) {
-          setFormData((prev) => ({
-            ...prev,
-            storageCost: STORAGE_COST,
-          }));
+        // При переходе на шаг 3 автоматически рассчитываем стоимость хранения и логистики
+        if (nextStep === 3) {
+          setFormData((prev) => {
+            const newData = { ...prev };
+            
+            // Рассчитываем стоимость хранения, если еще не рассчитана
+            if (!newData.storageCost) {
+              newData.storageCost = STORAGE_COST;
+            }
+            
+            // Рассчитываем стоимость логистики на основе объема товара (всегда пересчитываем при наличии объема)
+            if (newData.packageVolume) {
+              const volumeInLiters = parseFloat(newData.packageVolume) || 0;
+              if (volumeInLiters > 0) {
+                const logisticsCost = calculateLogisticsCost(volumeInLiters);
+                newData.logisticsCost = logisticsCost.toString();
+              } else {
+                newData.logisticsCost = "";
+              }
+            } else {
+              newData.logisticsCost = "";
+            }
+            
+            return newData;
+          });
         }
 
         setCurrentStep(nextStep);
@@ -377,12 +449,31 @@ export default function App() {
     if (currentStep > 1) {
       const prevStep = currentStep - 1;
 
-      // При переходе на шаг 3 автоматически рассчитываем стоимость хранения, если еще не рассчитана
-      if (prevStep === 3 && !formData.storageCost) {
-        setFormData((prev) => ({
-          ...prev,
-          storageCost: STORAGE_COST,
-        }));
+      // При переходе на шаг 3 автоматически рассчитываем стоимость хранения и логистики
+      if (prevStep === 3) {
+        setFormData((prev) => {
+          const newData = { ...prev };
+          
+          // Рассчитываем стоимость хранения, если еще не рассчитана
+          if (!newData.storageCost) {
+            newData.storageCost = STORAGE_COST;
+          }
+          
+          // Рассчитываем стоимость логистики на основе объема товара (всегда пересчитываем при наличии объема)
+          if (newData.packageVolume) {
+            const volumeInLiters = parseFloat(newData.packageVolume) || 0;
+            if (volumeInLiters > 0) {
+              const logisticsCost = calculateLogisticsCost(volumeInLiters);
+              newData.logisticsCost = logisticsCost.toString();
+            } else {
+              newData.logisticsCost = "";
+            }
+          } else {
+            newData.logisticsCost = "";
+          }
+          
+          return newData;
+        });
       }
 
       setCurrentStep(prevStep);
@@ -411,7 +502,9 @@ export default function App() {
     const logisticsCost = parseFloat(formData.logisticsCost) || 0;
     const storageCost = parseFloat(formData.storageCost) || 0;
     const returnPercent = parseFloat(formData.returnPercent) || 0;
-    const returnCost = (sellingPrice * returnPercent) / 100;
+    const returnCostPerUnit = parseFloat(formData.returnCostPerUnit) || 0;
+    // Расходы на возврат на 1 проданный товар = (процент возврата / 100) × стоимость возврата 1 единицы
+    const returnCost = (returnPercent / 100) * returnCostPerUnit;
 
     const totalCosts = purchasePrice + deliveryCost + packagingCost + otherExpenses + commissionAmount + logisticsCost + returnCost + storageCost;
     const profit = sellingPrice - totalCosts;
@@ -504,6 +597,7 @@ export default function App() {
     otherExpenses: parseFloat(formData.otherExpenses) || 0,
     logisticsCost: parseFloat(formData.logisticsCost) || 0,
     returnPercent: parseFloat(formData.returnPercent) || 0,
+    returnCostPerUnit: parseFloat(formData.returnCostPerUnit) || 0,
     storageCost: parseFloat(formData.storageCost) || 0,
   };
 
@@ -619,13 +713,16 @@ export default function App() {
               logisticsCost={formData.logisticsCost}
               storageCost={formData.storageCost}
               returnPercent={formData.returnPercent}
+              returnCostPerUnit={formData.returnCostPerUnit}
               onLogisticsCostChange={(value) => handleFieldChange("logisticsCost", value)}
               onReturnPercentChange={(value) => handleFieldChange("returnPercent", value)}
+              onReturnCostPerUnitChange={(value) => handleFieldChange("returnCostPerUnit", value)}
               errors={{
                 commission: errors.commission,
                 logisticsCost: errors.logisticsCost,
                 storageCost: errors.storageCost,
                 returnPercent: errors.returnPercent,
+                returnCostPerUnit: errors.returnCostPerUnit,
               }}
             />
           )}
@@ -638,10 +735,7 @@ export default function App() {
               productName={formData.productName}
               category={formData.category}
               onSellingPriceChange={(value) => handleFieldChange("sellingPrice", value)}
-              costData={{
-                ...costData,
-                returnPercent: parseFloat(formData.returnPercent) || 0,
-              }}
+              costData={costData}
               onCalculate={calculateMargin}
               result={null}
               onNewCalculation={resetForm}

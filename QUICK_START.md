@@ -100,3 +100,4 @@ git push origin main
 - **Полное руководство:** [DEVELOPMENT.md](./DEVELOPMENT.md)
 - **Архитектура проекта:** [ARCHITECTURE.md](./ARCHITECTURE.md)
 
+

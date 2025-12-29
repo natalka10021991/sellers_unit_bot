@@ -18,6 +18,7 @@ interface Step4Props {
     otherExpenses: number;
     logisticsCost: number;
     returnPercent: number;
+    returnCostPerUnit: number;
     storageCost: number;
   };
   onCalculate: () => void;
@@ -56,7 +57,8 @@ export function Step4({
 
     const price = parseFloat(sellingPrice);
     const commission = (price * (parseFloat(commissionPercent) || 0)) / 100;
-    const returnCost = (price * costData.returnPercent) / 100;
+    // Расходы на возврат на 1 проданный товар = (процент возврата / 100) × стоимость возврата 1 единицы
+    const returnCost = (costData.returnPercent / 100) * costData.returnCostPerUnit;
     
     const totalCosts =
       costData.purchasePrice +
@@ -192,7 +194,7 @@ export function Step4({
                       <div className="flex justify-between text-sm">
                         <span className="text-tg-hint">Возвраты</span>
                         <span className="text-tg-text">
-                          {sellingPrice ? ((parseFloat(sellingPrice) * costData.returnPercent) / 100).toFixed(0) : "0"} ₽
+                          {((costData.returnPercent / 100) * costData.returnCostPerUnit).toFixed(0)} ₽
                         </span>
                       </div>
                       <div className="flex justify-between text-sm">
@@ -238,6 +240,7 @@ export function Step4({
                       commissionPercent: parseFloat(commissionPercent) || 0,
                       logisticsCost: costData.logisticsCost,
                       returnPercent: costData.returnPercent,
+                      returnCostPerUnit: costData.returnCostPerUnit,
                       storageCost: costData.storageCost,
                       sellingPrice: parseFloat(sellingPrice),
                       profit: metrics.profit,
